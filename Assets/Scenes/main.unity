@@ -1710,9 +1710,6 @@ MonoBehaviour:
   ball: {fileID: 2122530582}
   brickTemplate: {fileID: 409998267}
   scoreText: {fileID: 422646157}
-  turnText: {fileID: 0}
-  livesText: {fileID: 0}
-  statusText: {fileID: 0}
   gameOverPanel: {fileID: 1593447157}
   restartButton: {fileID: 2085718255}
   columns: 7
