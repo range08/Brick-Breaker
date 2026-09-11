@@ -196,7 +196,7 @@ public class GameManager : MonoBehaviour
     private void UpdateHud()
     {
         if (scoreText != null)
-            scoreText.text = $"SCORE  {score:0000}";
+            scoreText.text = score.ToString();
 
         if (turnText != null)
             turnText.text = $"TURN  {turn:00}  ·  STAGE  {stage:00}";

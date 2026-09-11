@@ -10,7 +10,7 @@ public class BallScript : MonoBehaviour
 {
     [Header("Launch")]
     [SerializeField, Min(0.1f)]
-    private float speed = 7.5f;
+    private float speed = 15f;
 
     [SerializeField, Min(0.01f)]
     private float minimumDragPixels = 35f;
