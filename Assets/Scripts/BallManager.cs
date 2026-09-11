@@ -22,6 +22,7 @@ public class BallManager : MonoBehaviour
     private readonly List<BallScript> activeBalls = new();
 
     private GameManager gameManager;
+    private TrajectoryPreview trajectoryPreview;
     private Camera worldCamera;
     private Vector3 nextLaunchPosition;
     private Vector2 dragStartScreenPosition;
@@ -41,11 +42,14 @@ public class BallManager : MonoBehaviour
     public Vector3 NextLaunchPosition => nextLaunchPosition;
     public Vector2 LastLaunchDirection => lastLaunchDirection;
     public IReadOnlyList<BallScript> ActiveBalls => activeBalls;
+    public Vector2 AimOrigin => nextLaunchPosition;
+    public float BallRadius => ballTemplate != null ? ballTemplate.GetWorldRadius() : 0.25f;
 
     public void Initialize(GameManager owner, BallScript template)
     {
         gameManager = owner;
         worldCamera = Camera.main;
+        trajectoryPreview = owner != null ? owner.GetComponent<TrajectoryPreview>() : GetComponent<TrajectoryPreview>();
 
         if (ballTemplate == null)
             ballTemplate = template;
@@ -71,6 +75,7 @@ public class BallManager : MonoBehaviour
         isDragging = false;
         launchSequenceRunning = false;
         volleyActive = false;
+        trajectoryPreview?.Clear();
 
         EnsurePoolSize(CurrentVolleyCount);
 
@@ -106,6 +111,7 @@ public class BallManager : MonoBehaviour
         if (direction.sqrMagnitude < 0.01f)
             return false;
 
+        trajectoryPreview?.Clear();
         StartCoroutine(LaunchVolley(direction));
         return true;
     }
@@ -143,6 +149,7 @@ public class BallManager : MonoBehaviour
         launchSequenceRunning = false;
         volleyActive = false;
         isDragging = false;
+        trajectoryPreview?.Clear();
     }
 
     private void Update()
@@ -159,10 +166,25 @@ public class BallManager : MonoBehaviour
             isDragging = true;
         }
 
-        if (!isDragging || !TryGetPointerUp(out pointerPosition))
+        if (!isDragging)
+            return;
+
+        if (TryGetPointerPosition(out pointerPosition))
+        {
+            Vector2 previewTargetWorldPosition = worldCamera != null
+                ? worldCamera.ScreenToWorldPoint(pointerPosition)
+                : nextLaunchPosition;
+            Vector2 previewDirection = ClampLaunchDirection(previewTargetWorldPosition - (Vector2)nextLaunchPosition);
+
+            if ((pointerPosition - dragStartScreenPosition).sqrMagnitude >= GetMinimumDragPixelsSquared())
+                trajectoryPreview?.Draw(nextLaunchPosition, previewDirection, BallRadius);
+        }
+
+        if (!TryGetPointerUp(out pointerPosition))
             return;
 
         isDragging = false;
+        trajectoryPreview?.Clear();
 
         if (worldCamera == null)
             return;
@@ -248,6 +270,24 @@ public class BallManager : MonoBehaviour
     private float GetMinimumDragPixelsSquared()
     {
         return 35f * 35f;
+    }
+
+    private static bool TryGetPointerPosition(out Vector2 screenPosition)
+    {
+        if (Touchscreen.current != null && Touchscreen.current.primaryTouch.press.isPressed)
+        {
+            screenPosition = Touchscreen.current.primaryTouch.position.ReadValue();
+            return true;
+        }
+
+        if (Mouse.current != null && Mouse.current.leftButton.isPressed)
+        {
+            screenPosition = Mouse.current.position.ReadValue();
+            return true;
+        }
+
+        screenPosition = default;
+        return false;
     }
 
     private static Vector2 ClampLaunchDirection(Vector2 direction)

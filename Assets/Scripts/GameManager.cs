@@ -29,6 +29,7 @@ public class GameManager : MonoBehaviour
     private BallManager ballManager;
     private BlockGridManager blockGridManager;
     private GameHud gameHud;
+    private TrajectoryPreview trajectoryPreview;
     private bool gameOver;
 
     public GameState State { get; private set; } = GameState.Start;
@@ -37,6 +38,7 @@ public class GameManager : MonoBehaviour
     public BallManager BallManager => ballManager;
     public BlockGridManager BlockGridManager => blockGridManager;
     public GameHud GameHud => gameHud;
+    public TrajectoryPreview TrajectoryPreview => trajectoryPreview;
 
     private void Awake()
     {
@@ -51,6 +53,7 @@ public class GameManager : MonoBehaviour
         ballManager = GetComponent<BallManager>();
         blockGridManager = GetComponent<BlockGridManager>();
         gameHud = GetComponent<GameHud>();
+        trajectoryPreview = GetComponent<TrajectoryPreview>();
 
         if (ballManager == null)
             ballManager = gameObject.AddComponent<BallManager>();
@@ -60,6 +63,9 @@ public class GameManager : MonoBehaviour
 
         if (gameHud == null)
             gameHud = gameObject.AddComponent<GameHud>();
+
+        if (trajectoryPreview == null)
+            trajectoryPreview = gameObject.AddComponent<TrajectoryPreview>();
     }
 
     private void Start()
