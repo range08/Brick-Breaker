@@ -117,9 +117,6 @@ public class BallScript : MonoBehaviour
 
         isLaunched = true;
         ballRigidbody.linearVelocity = direction * speed;
-
-        if (GameManager.Instance != null)
-            GameManager.Instance.NotifyBallLaunched();
     }
 
     private static bool TryGetPointerDown(out Vector2 screenPosition)

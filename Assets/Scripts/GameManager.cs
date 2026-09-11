@@ -16,9 +16,6 @@ public class GameManager : MonoBehaviour
     [SerializeField] private BallScript ball;
     [SerializeField] private BrickBlock brickTemplate;
     [SerializeField] private TMP_Text scoreText;
-    [SerializeField] private TMP_Text turnText;
-    [SerializeField] private TMP_Text livesText;
-    [SerializeField] private TMP_Text statusText;
     [SerializeField] private GameObject gameOverPanel;
     [SerializeField] private Button restartButton;
 
@@ -80,9 +77,6 @@ public class GameManager : MonoBehaviour
             brickTemplate = FindFirstObjectByType<BrickBlock>();
 
         scoreText = scoreText != null ? scoreText : FindText("ScoreText");
-        turnText = turnText != null ? turnText : FindText("TurnText");
-        livesText = livesText != null ? livesText : FindText("LivesText");
-        statusText = statusText != null ? statusText : FindText("StatusText");
 
         if (gameOverPanel == null)
             gameOverPanel = GameObject.Find("GameOverPanel");
@@ -124,12 +118,6 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    public void NotifyBallLaunched()
-    {
-        if (statusText != null)
-            statusText.text = "공이 진행 중입니다";
-    }
-
     public void NotifyBallLost(BallScript lostBall)
     {
         if (gameOver || lostBall == null || !lostBall.IsLaunched)
@@ -146,18 +134,12 @@ public class GameManager : MonoBehaviour
             if (gameOverPanel != null)
                 gameOverPanel.SetActive(true);
 
-            if (statusText != null)
-                statusText.text = "게임 오버";
-
             UpdateHud();
             return;
         }
 
         turn++;
         lostBall.PrepareForLaunch();
-
-        if (statusText != null)
-            statusText.text = "터치 후 위로 드래그하여 발사";
 
         UpdateHud();
     }
@@ -187,9 +169,6 @@ public class GameManager : MonoBehaviour
         if (ball != null)
             ball.PrepareForLaunch();
 
-        if (statusText != null)
-            statusText.text = $"STAGE {stage}  ·  터치 후 위로 드래그하여 발사";
-
         UpdateHud();
     }
 
@@ -197,12 +176,6 @@ public class GameManager : MonoBehaviour
     {
         if (scoreText != null)
             scoreText.text = score.ToString();
-
-        if (turnText != null)
-            turnText.text = $"TURN  {turn:00}  ·  STAGE  {stage:00}";
-
-        if (livesText != null)
-            livesText.text = $"LIVES  {Mathf.Max(0, lives)}";
     }
 
     public void RestartGame()
