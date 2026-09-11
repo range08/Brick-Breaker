@@ -116,6 +116,7 @@ InitTestScene*.unity*
 # Local validation captures and Unity recovery/build-test output
 /runtime_*.png
 /diagnostics_*.png
+/visual_*.png
 /[Aa]ssets/diagnostics_*.png
 /[Aa]ssets/diagnostics_*.png.meta
 /[Aa]ssets/_Recovery*

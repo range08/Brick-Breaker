@@ -70,11 +70,11 @@ public class BrickBlock : MonoBehaviour
 
         spriteRenderer.color = hitPoints switch
         {
-            <= 1 => new Color(0.18f, 0.75f, 0.95f),
-            2 => new Color(0.48f, 0.42f, 0.95f),
-            3 => new Color(0.82f, 0.35f, 0.88f),
-            4 => new Color(0.98f, 0.42f, 0.32f),
-            _ => new Color(0.98f, 0.68f, 0.22f)
+            <= 1 => new Color32(0x22, 0xC5, 0x5E, 0xFF),
+            2 => new Color32(0x16, 0xA3, 0x4A, 0xFF),
+            3 => new Color32(0x15, 0x80, 0x3D, 0xFF),
+            4 => new Color32(0x16, 0x65, 0x34, 0xFF),
+            _ => new Color32(0x14, 0x53, 0x2D, 0xFF)
         };
     }
 }
