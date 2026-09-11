@@ -28,6 +28,7 @@ public class GameManager : MonoBehaviour
 
     private BallManager ballManager;
     private BlockGridManager blockGridManager;
+    private GameHud gameHud;
     private bool gameOver;
 
     public GameState State { get; private set; } = GameState.Start;
@@ -35,6 +36,7 @@ public class GameManager : MonoBehaviour
     public bool CanAcceptAim => !gameOver && State == GameState.Aiming;
     public BallManager BallManager => ballManager;
     public BlockGridManager BlockGridManager => blockGridManager;
+    public GameHud GameHud => gameHud;
 
     private void Awake()
     {
@@ -48,12 +50,16 @@ public class GameManager : MonoBehaviour
         Application.targetFrameRate = 60;
         ballManager = GetComponent<BallManager>();
         blockGridManager = GetComponent<BlockGridManager>();
+        gameHud = GetComponent<GameHud>();
 
         if (ballManager == null)
             ballManager = gameObject.AddComponent<BallManager>();
 
         if (blockGridManager == null)
             blockGridManager = gameObject.AddComponent<BlockGridManager>();
+
+        if (gameHud == null)
+            gameHud = gameObject.AddComponent<GameHud>();
     }
 
     private void Start()
@@ -69,6 +75,7 @@ public class GameManager : MonoBehaviour
         blockGridManager.Initialize(this, brickTemplate);
         blockGridManager.BuildInitialGrid(Round);
         ballManager.Initialize(this, ball);
+        gameHud.Initialize();
         BeginGame();
     }
 
@@ -79,6 +86,7 @@ public class GameManager : MonoBehaviour
 
         State = GameState.Aiming;
         ballManager.PrepareForRound();
+        gameHud?.Refresh(Round, ballManager.PermanentBallCount);
     }
 
     public void NotifyBallLaunched(BallScript launchedBall)
@@ -108,6 +116,15 @@ public class GameManager : MonoBehaviour
         }
 
         BeginGame();
+    }
+
+    public void NotifyBlockHit(BrickBlock block, Vector2 hitPoint)
+    {
+    }
+
+    public void NotifyBonusBallCollected()
+    {
+        gameHud?.Refresh(Round, ballManager.PermanentBallCount);
     }
 
     public void TriggerGameOver()
