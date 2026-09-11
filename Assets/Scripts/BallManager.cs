@@ -523,7 +523,7 @@ public class BallManager : MonoBehaviour
         if (eventSystem == null)
             return false;
 
-        if (eventSystem.IsPointerOverGameObject(pointerId))
+        if (pointerId >= 0 && eventSystem.IsPointerOverGameObject(pointerId))
             return true;
 
         PointerEventData pointerData = new(eventSystem)
