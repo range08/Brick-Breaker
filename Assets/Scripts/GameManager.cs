@@ -1,12 +1,21 @@
 using System.Collections.Generic;
-using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
+public enum GameState
+{
+    Start,
+    Aiming,
+    Playing,
+    RoundEnd,
+    GameOver,
+    Pause
+}
+
 /// <summary>
-/// Owns the small one-ball game loop: board creation, score, turns, lives,
-/// UI updates and restart handling.
+/// Coordinates the current prototype loop. Board ownership is moved into
+/// BlockGridManager in the next phase; this phase focuses on volley lifecycle.
 /// </summary>
 public class GameManager : MonoBehaviour
 {
@@ -15,28 +24,24 @@ public class GameManager : MonoBehaviour
     [Header("Scene References")]
     [SerializeField] private BallScript ball;
     [SerializeField] private BrickBlock brickTemplate;
-    [SerializeField] private TMP_Text scoreText;
     [SerializeField] private GameObject gameOverPanel;
     [SerializeField] private Button restartButton;
 
-    [Header("Board")]
+    [Header("Temporary Board Settings")]
     [SerializeField, Range(3, 8)] private int columns = 7;
     [SerializeField, Range(2, 7)] private int rows = 5;
-    [SerializeField, Min(0.1f)] private float horizontalSpacing = 1.25f;
-    [SerializeField, Min(0.1f)] private float verticalSpacing = 0.82f;
-    [SerializeField] private Vector2 boardOrigin = new Vector2(-3.75f, 5.3f);
-    [SerializeField, Min(1)] private int startingLives = 3;
+    [SerializeField, Min(0.1f)] private float horizontalSpacing = 1.2f;
+    [SerializeField, Min(0.1f)] private float verticalSpacing = 1.2f;
+    [SerializeField] private Vector2 boardOrigin = new(-3.75f, 5.3f);
 
     private readonly List<BrickBlock> activeBricks = new();
-    private int score;
-    private int turn = 1;
-    private int lives;
-    private int stage = 1;
+    private BallManager ballManager;
     private bool gameOver;
 
-    public int Score => score;
-    public int Turn => turn;
-    public int Lives => lives;
+    public GameState State { get; private set; } = GameState.Start;
+    public int Round { get; private set; } = 1;
+    public bool CanAcceptAim => !gameOver && State == GameState.Aiming;
+    public BallManager BallManager => ballManager;
 
     private void Awake()
     {
@@ -48,7 +53,10 @@ public class GameManager : MonoBehaviour
 
         Instance = this;
         Application.targetFrameRate = 60;
-        lives = startingLives;
+        ballManager = GetComponent<BallManager>();
+
+        if (ballManager == null)
+            ballManager = gameObject.AddComponent<BallManager>();
     }
 
     private void Start()
@@ -62,10 +70,66 @@ public class GameManager : MonoBehaviour
         if (gameOverPanel != null)
             gameOverPanel.SetActive(false);
 
-        UpdateHud();
+        ballManager.Initialize(this, ball);
+        BeginGame();
+    }
 
-        if (ball != null)
-            ball.PrepareForLaunch();
+    public void BeginGame()
+    {
+        if (gameOver)
+            return;
+
+        State = GameState.Aiming;
+        ballManager.PrepareForRound();
+    }
+
+    public void NotifyBallLaunched(BallScript launchedBall)
+    {
+        if (gameOver)
+            return;
+
+        State = GameState.Playing;
+    }
+
+    public void NotifyVolleyLaunchSequenceComplete()
+    {
+        if (!gameOver)
+            State = GameState.Playing;
+    }
+
+    public void NotifyAllBallsReturned(Vector3 nextLaunchPosition)
+    {
+        if (gameOver)
+            return;
+
+        State = GameState.RoundEnd;
+    }
+
+    // Compatibility hooks removed with the old score system in Phase 3.
+    public void NotifyBlockDamaged()
+    {
+    }
+
+    public void NotifyBlockDestroyed(BrickBlock block)
+    {
+    }
+
+    public void TriggerGameOver()
+    {
+        if (gameOver)
+            return;
+
+        gameOver = true;
+        State = GameState.GameOver;
+        ballManager.StopAllBalls();
+
+        if (gameOverPanel != null)
+            gameOverPanel.SetActive(true);
+    }
+
+    public void RestartGame()
+    {
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 
     private void ResolveSceneReferences()
@@ -76,19 +140,11 @@ public class GameManager : MonoBehaviour
         if (brickTemplate == null)
             brickTemplate = FindFirstObjectByType<BrickBlock>();
 
-        scoreText = scoreText != null ? scoreText : FindText("ScoreText");
-
         if (gameOverPanel == null)
             gameOverPanel = GameObject.Find("GameOverPanel");
 
         if (restartButton == null && gameOverPanel != null)
             restartButton = gameOverPanel.GetComponentInChildren<Button>(true);
-    }
-
-    private static TMP_Text FindText(string objectName)
-    {
-        GameObject target = GameObject.Find(objectName);
-        return target != null ? target.GetComponent<TMP_Text>() : null;
     }
 
     private void BuildBoard()
@@ -110,76 +166,9 @@ public class GameManager : MonoBehaviour
                     boardOrigin.y - row * verticalSpacing,
                     0f);
                 block.gameObject.SetActive(true);
-
-                int hitPoints = 1 + ((row + stage - 1) % 4);
-                block.Configure(hitPoints, this);
+                block.Configure(row + 1, this);
                 activeBricks.Add(block);
             }
         }
-    }
-
-    public void NotifyBallLost(BallScript lostBall)
-    {
-        if (gameOver || lostBall == null || !lostBall.IsLaunched)
-            return;
-
-        lives--;
-
-        if (lives <= 0)
-        {
-            gameOver = true;
-            lostBall.PrepareForLaunch();
-            lostBall.gameObject.SetActive(false);
-
-            if (gameOverPanel != null)
-                gameOverPanel.SetActive(true);
-
-            UpdateHud();
-            return;
-        }
-
-        turn++;
-        lostBall.PrepareForLaunch();
-
-        UpdateHud();
-    }
-
-    public void NotifyBlockDamaged()
-    {
-        score += 5;
-        UpdateHud();
-    }
-
-    public void NotifyBlockDestroyed(BrickBlock block)
-    {
-        score += 25;
-        activeBricks.Remove(block);
-        UpdateHud();
-
-        if (activeBricks.Count == 0)
-            AdvanceStage();
-    }
-
-    private void AdvanceStage()
-    {
-        stage++;
-        turn++;
-        BuildBoard();
-
-        if (ball != null)
-            ball.PrepareForLaunch();
-
-        UpdateHud();
-    }
-
-    private void UpdateHud()
-    {
-        if (scoreText != null)
-            scoreText.text = score.ToString();
-    }
-
-    public void RestartGame()
-    {
-        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 }

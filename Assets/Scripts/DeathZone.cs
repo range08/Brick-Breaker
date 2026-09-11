@@ -1,8 +1,8 @@
 using UnityEngine;
 
 /// <summary>
-/// Trigger below the play field. It ends the current ball flight without
-/// physically bouncing the ball back into the field.
+/// Trigger below the play field. It never bounces a ball; it forwards the
+/// return event to that ball's BallManager.
 /// </summary>
 [RequireComponent(typeof(BoxCollider2D))]
 public class DeathZone : MonoBehaviour
@@ -17,9 +17,7 @@ public class DeathZone : MonoBehaviour
 
     private void OnTriggerEnter2D(Collider2D other)
     {
-        BallScript ball = other.GetComponent<BallScript>();
-
-        if (ball != null && GameManager.Instance != null)
-            GameManager.Instance.NotifyBallLost(ball);
+        if (other.TryGetComponent(out BallScript ball))
+            ball.NotifyDeathZone();
     }
 }
