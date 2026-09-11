@@ -31,6 +31,7 @@ public class GameManager : MonoBehaviour
     private GameHud gameHud;
     private TrajectoryPreview trajectoryPreview;
     private TimeController timeController;
+    private FeverController feverController;
     private bool gameOver;
     private GameState stateBeforePause = GameState.Aiming;
 
@@ -42,6 +43,7 @@ public class GameManager : MonoBehaviour
     public GameHud GameHud => gameHud;
     public TrajectoryPreview TrajectoryPreview => trajectoryPreview;
     public TimeController TimeController => timeController;
+    public FeverController FeverController => feverController;
 
     private void Awake()
     {
@@ -58,6 +60,7 @@ public class GameManager : MonoBehaviour
         gameHud = GetComponent<GameHud>();
         trajectoryPreview = GetComponent<TrajectoryPreview>();
         timeController = GetComponent<TimeController>();
+        feverController = GetComponent<FeverController>();
 
         if (ballManager == null)
             ballManager = gameObject.AddComponent<BallManager>();
@@ -73,6 +76,9 @@ public class GameManager : MonoBehaviour
 
         if (timeController == null)
             timeController = gameObject.AddComponent<TimeController>();
+
+        if (feverController == null)
+            feverController = gameObject.AddComponent<FeverController>();
     }
 
     private void Start()
@@ -91,6 +97,7 @@ public class GameManager : MonoBehaviour
         gameHud.Initialize();
         gameHud.SetPauseCallback(TogglePause);
         timeController.Initialize();
+        feverController.Initialize(this);
         BeginGame();
     }
 
@@ -102,6 +109,7 @@ public class GameManager : MonoBehaviour
         State = GameState.Aiming;
         stateBeforePause = GameState.Aiming;
         timeController.BeginRound();
+        feverController.BeginRound();
         ballManager.PrepareForRound();
         gameHud?.Refresh(Round, ballManager.PermanentBallCount);
         gameHud?.SetPauseVisible(true);
@@ -130,6 +138,7 @@ public class GameManager : MonoBehaviour
 
         State = GameState.RoundEnd;
         timeController.EndRound();
+        feverController.EndRound();
         Round++;
 
         if (!blockGridManager.AdvanceGrid(Round))
@@ -143,6 +152,7 @@ public class GameManager : MonoBehaviour
 
     public void NotifyBlockHit(BrickBlock block, Vector2 hitPoint)
     {
+        feverController?.RegisterHit();
     }
 
     public void NotifyBonusBallCollected()
@@ -159,6 +169,7 @@ public class GameManager : MonoBehaviour
         State = GameState.GameOver;
         timeController.SetGameOver();
         ballManager.StopAllBalls();
+        feverController.EndRound();
         gameHud?.SetPauseVisible(false);
 
         if (gameOverPanel != null)
