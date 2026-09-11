@@ -208,6 +208,7 @@ public class GameManager : MonoBehaviour
 
     public void RestartGame()
     {
+        timeController?.SetGameOver();
         SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 

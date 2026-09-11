@@ -28,12 +28,14 @@ public class BlockGridManager : MonoBehaviour
     [SerializeField, Range(0f, 1f)] private float bonusBlockChance = 0.15f;
 
     [Header("Dead Line")]
-    [Tooltip("Distance above the camera bottom used as the block dead line.")]
+    [Tooltip("Distance above the initial ball launch position used as the block dead line.")]
     [SerializeField, Min(0.1f)] private float deadLinePaddingFromBottom = 1.5f;
 
     private readonly List<BrickBlock> activeBlocks = new();
     private GameManager gameManager;
     private BallManager ballManager;
+    private float initialLaunchY;
+    private bool initialLaunchYInitialized;
 
     public int ActiveBlockCount => activeBlocks.Count;
     public float VerticalSpacing => verticalSpacing;
@@ -47,6 +49,14 @@ public class BlockGridManager : MonoBehaviour
         ballManager = owner != null ? owner.BallManager : FindFirstObjectByType<BallManager>();
         targetCamera = targetCamera != null ? targetCamera : Camera.main;
         brickTemplate = brickTemplate != null ? brickTemplate : template;
+
+        BallScript launchBall = FindFirstObjectByType<BallScript>();
+
+        if (launchBall != null)
+        {
+            initialLaunchY = launchBall.transform.position.y;
+            initialLaunchYInitialized = true;
+        }
     }
 
     public void BuildInitialGrid(int round)
@@ -102,10 +112,7 @@ public class BlockGridManager : MonoBehaviour
 
     public Color GetHpColor(int hitPoints)
     {
-        int round = gameManager != null ? gameManager.Round : 1;
-        int roundMinimum = GetRoundMinimumHp(round);
-        float displayCeiling = Mathf.Max(roundMinimum + hpVariance + 2f, 4f);
-        float ratio = Mathf.Clamp01((hitPoints - roundMinimum + 1f) / displayCeiling);
+        float ratio = Mathf.Clamp01(hitPoints / (float)Mathf.Max(1, maxGeneratedHp));
 
         if (ratio <= 0.25f)
             return new Color32(0x20, 0xC9, 0x63, 0xFF);
@@ -221,6 +228,28 @@ public class BlockGridManager : MonoBehaviour
 
     private float GetDeadLineY()
     {
+        if (!initialLaunchYInitialized)
+        {
+            if (ballManager == null)
+                ballManager = gameManager != null ? gameManager.BallManager : FindFirstObjectByType<BallManager>();
+
+            BallScript launchBall = FindFirstObjectByType<BallScript>();
+
+            if (launchBall != null)
+            {
+                initialLaunchY = launchBall.transform.position.y;
+                initialLaunchYInitialized = true;
+            }
+            else if (ballManager != null)
+            {
+                initialLaunchY = ballManager.NextLaunchPosition.y;
+                initialLaunchYInitialized = true;
+            }
+        }
+
+        if (initialLaunchYInitialized)
+            return initialLaunchY + deadLinePaddingFromBottom;
+
         if (targetCamera == null)
             targetCamera = Camera.main;
 

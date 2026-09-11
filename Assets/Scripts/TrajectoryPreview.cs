@@ -85,8 +85,9 @@ public class TrajectoryPreview : MonoBehaviour
             if (hit.collider.TryGetComponent<DeathZone>(out _))
                 break;
 
-            castOrigin = hit.point + hit.normal * castSkin;
+            castOrigin = hit.centroid + hit.normal * castSkin;
             castDirection = Vector2.Reflect(castDirection, hit.normal).normalized;
+            remainingDistance = Mathf.Max(0f, remainingDistance - castSkin);
         }
 
         lineRenderer.positionCount = pointCount;

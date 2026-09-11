@@ -291,6 +291,9 @@ public class GameHud : MonoBehaviour
 
         canvas.overrideSorting = true;
         canvas.sortingOrder = 100;
+
+        if (startScreen.GetComponent<GraphicRaycaster>() == null)
+            startScreen.AddComponent<GraphicRaycaster>();
     }
 
     private void ApplyStyle(TMP_Text text)
