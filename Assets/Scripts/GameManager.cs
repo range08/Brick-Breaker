@@ -30,7 +30,9 @@ public class GameManager : MonoBehaviour
     private BlockGridManager blockGridManager;
     private GameHud gameHud;
     private TrajectoryPreview trajectoryPreview;
+    private TimeController timeController;
     private bool gameOver;
+    private GameState stateBeforePause = GameState.Aiming;
 
     public GameState State { get; private set; } = GameState.Start;
     public int Round { get; private set; } = 1;
@@ -39,6 +41,7 @@ public class GameManager : MonoBehaviour
     public BlockGridManager BlockGridManager => blockGridManager;
     public GameHud GameHud => gameHud;
     public TrajectoryPreview TrajectoryPreview => trajectoryPreview;
+    public TimeController TimeController => timeController;
 
     private void Awake()
     {
@@ -54,6 +57,7 @@ public class GameManager : MonoBehaviour
         blockGridManager = GetComponent<BlockGridManager>();
         gameHud = GetComponent<GameHud>();
         trajectoryPreview = GetComponent<TrajectoryPreview>();
+        timeController = GetComponent<TimeController>();
 
         if (ballManager == null)
             ballManager = gameObject.AddComponent<BallManager>();
@@ -66,6 +70,9 @@ public class GameManager : MonoBehaviour
 
         if (trajectoryPreview == null)
             trajectoryPreview = gameObject.AddComponent<TrajectoryPreview>();
+
+        if (timeController == null)
+            timeController = gameObject.AddComponent<TimeController>();
     }
 
     private void Start()
@@ -82,6 +89,8 @@ public class GameManager : MonoBehaviour
         blockGridManager.BuildInitialGrid(Round);
         ballManager.Initialize(this, ball);
         gameHud.Initialize();
+        gameHud.SetPauseCallback(TogglePause);
+        timeController.Initialize();
         BeginGame();
     }
 
@@ -91,14 +100,21 @@ public class GameManager : MonoBehaviour
             return;
 
         State = GameState.Aiming;
+        stateBeforePause = GameState.Aiming;
+        timeController.BeginRound();
         ballManager.PrepareForRound();
         gameHud?.Refresh(Round, ballManager.PermanentBallCount);
+        gameHud?.SetPauseVisible(true);
+        gameHud?.SetPaused(false);
     }
 
     public void NotifyBallLaunched(BallScript launchedBall)
     {
         if (!gameOver)
+        {
             State = GameState.Playing;
+            timeController.BeginFlight();
+        }
     }
 
     public void NotifyVolleyLaunchSequenceComplete()
@@ -113,6 +129,7 @@ public class GameManager : MonoBehaviour
             return;
 
         State = GameState.RoundEnd;
+        timeController.EndRound();
         Round++;
 
         if (!blockGridManager.AdvanceGrid(Round))
@@ -140,7 +157,9 @@ public class GameManager : MonoBehaviour
 
         gameOver = true;
         State = GameState.GameOver;
+        timeController.SetGameOver();
         ballManager.StopAllBalls();
+        gameHud?.SetPauseVisible(false);
 
         if (gameOverPanel != null)
             gameOverPanel.SetActive(true);
@@ -149,6 +168,28 @@ public class GameManager : MonoBehaviour
     public void RestartGame()
     {
         SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+    }
+
+    public void TogglePause()
+    {
+        if (gameOver)
+            return;
+
+        if (State == GameState.Pause)
+        {
+            State = stateBeforePause;
+            timeController.SetPaused(false);
+            gameHud?.SetPaused(false);
+            return;
+        }
+
+        if (State != GameState.Aiming && State != GameState.Playing)
+            return;
+
+        stateBeforePause = State;
+        State = GameState.Pause;
+        timeController.SetPaused(true);
+        gameHud?.SetPaused(true);
     }
 
     private void ResolveSceneReferences()
