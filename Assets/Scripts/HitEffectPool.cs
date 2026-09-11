@@ -66,9 +66,9 @@ public class HitEffectPool : MonoBehaviour
         effectObject.SetActive(false);
 
         ParticleSystem effect = effectObject.AddComponent<ParticleSystem>();
-        effect.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
         ParticleSystem.MainModule main = effect.main;
         main.playOnAwake = false;
+        effect.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
         main.loop = false;
         main.duration = 0.12f;
         main.startLifetime = new ParticleSystem.MinMaxCurve(0.1f, 0.18f);
