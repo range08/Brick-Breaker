@@ -48,6 +48,7 @@ public class GameManager : MonoBehaviour
     public FeverController FeverController => feverController;
     public AudioManager AudioManager => audioManager;
     public HitEffectPool HitEffectPool => hitEffectPool;
+    public bool IsGameOverPanelVisible => gameOverPanel != null && gameOverPanel.activeSelf;
 
     private void Awake()
     {
