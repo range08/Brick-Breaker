@@ -38,6 +38,7 @@ public class HitEffectPool : MonoBehaviour
         if (effect == null)
             return;
 
+        effect.gameObject.SetActive(true);
         ParticleSystem.MainModule main = effect.main;
         main.startColor = color;
         effect.transform.position = worldPosition;
@@ -62,8 +63,10 @@ public class HitEffectPool : MonoBehaviour
     {
         GameObject effectObject = new($"HitEffect_{index + 1}");
         effectObject.transform.SetParent(transform, false);
+        effectObject.SetActive(false);
 
         ParticleSystem effect = effectObject.AddComponent<ParticleSystem>();
+        effect.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
         ParticleSystem.MainModule main = effect.main;
         main.playOnAwake = false;
         main.loop = false;
