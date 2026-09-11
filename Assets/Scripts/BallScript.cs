@@ -9,7 +9,10 @@ public class BallScript : MonoBehaviour
     [Header("Launch")]
     [SerializeField, Min(0.1f)] private float speed = 15f;
 
+    [SerializeField, Range(0.01f, 0.2f)] private float minimumVerticalComponent = 0.1f;
+
     private Rigidbody2D ballRigidbody;
+    private CircleCollider2D ballCollider;
     private BallManager ballManager;
     private Vector3 launchPosition;
     private bool isLaunched;
@@ -22,24 +25,33 @@ public class BallScript : MonoBehaviour
 
     private void Awake()
     {
-        ballRigidbody = GetComponent<Rigidbody2D>();
-        ballRigidbody.gravityScale = 0f;
-        ballRigidbody.interpolation = RigidbodyInterpolation2D.Interpolate;
-        ballRigidbody.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
+        CachePhysicsComponents();
+        SetPhysicsEnabled(false);
         launchPosition = transform.position;
     }
 
     private void FixedUpdate()
     {
-        if (!isLaunched || ballRigidbody.linearVelocity.sqrMagnitude <= 0.01f)
+        if (!isLaunched || ballRigidbody == null || ballRigidbody.linearVelocity.sqrMagnitude <= 0.01f)
             return;
 
-        ballRigidbody.linearVelocity = ballRigidbody.linearVelocity.normalized * speed;
+        Vector2 direction = ballRigidbody.linearVelocity.normalized;
+
+        if (Mathf.Abs(direction.y) < minimumVerticalComponent)
+        {
+            float verticalSign = direction.y == 0f ? 1f : Mathf.Sign(direction.y);
+            direction.y = verticalSign * minimumVerticalComponent;
+            direction.Normalize();
+        }
+
+        ballRigidbody.linearVelocity = direction * speed;
     }
 
     public void Initialize(BallManager owner)
     {
         ballManager = owner;
+        CachePhysicsComponents();
+        SetPhysicsEnabled(false);
     }
 
     public void PrepareForLaunch()
@@ -53,10 +65,17 @@ public class BallScript : MonoBehaviour
         isLaunched = false;
         isReturning = false;
 
-        gameObject.SetActive(true);
+        SetPhysicsEnabled(false);
         ballRigidbody.linearVelocity = Vector2.zero;
         ballRigidbody.angularVelocity = 0f;
         transform.position = launchPosition;
+        gameObject.SetActive(false);
+    }
+
+    public void ShowReadyForAim(Vector3 position)
+    {
+        PrepareForLaunch(position);
+        gameObject.SetActive(true);
     }
 
     public void SetLaunchPosition(Vector3 position)
@@ -67,9 +86,11 @@ public class BallScript : MonoBehaviour
 
     public void Launch(Vector2 direction)
     {
-        if (!gameObject.activeInHierarchy)
+        if (ballRigidbody == null)
             return;
 
+        gameObject.SetActive(true);
+        SetPhysicsEnabled(true);
         isReturning = false;
         isLaunched = true;
         ballRigidbody.linearVelocity = direction.normalized * speed;
@@ -81,6 +102,7 @@ public class BallScript : MonoBehaviour
         isReturning = true;
         ballRigidbody.linearVelocity = Vector2.zero;
         ballRigidbody.angularVelocity = 0f;
+        SetPhysicsEnabled(false);
         launchPosition = position;
         transform.position = position;
         gameObject.SetActive(false);
@@ -95,6 +117,7 @@ public class BallScript : MonoBehaviour
         isReturning = true;
         ballRigidbody.linearVelocity = Vector2.zero;
         ballRigidbody.angularVelocity = 0f;
+        SetPhysicsEnabled(false);
 
         if (ballManager == null)
             ballManager = FindFirstObjectByType<BallManager>();
@@ -106,6 +129,9 @@ public class BallScript : MonoBehaviour
     private void OnCollisionEnter2D(Collision2D collision)
     {
         if (!isLaunched || isReturning || GameManager.Instance == null)
+            return;
+
+        if (collision.collider.TryGetComponent<BallScript>(out _))
             return;
 
         if (collision.collider.TryGetComponent<BrickBlock>(out _))
@@ -133,5 +159,30 @@ public class BallScript : MonoBehaviour
 
         ballRigidbody.linearVelocity = Vector2.zero;
         ballRigidbody.angularVelocity = 0f;
+    }
+
+    private void SetPhysicsEnabled(bool enabled)
+    {
+        if (ballRigidbody != null)
+            ballRigidbody.simulated = enabled;
+
+        if (ballCollider != null)
+            ballCollider.enabled = enabled;
+    }
+
+    private void CachePhysicsComponents()
+    {
+        if (ballRigidbody == null)
+            ballRigidbody = GetComponent<Rigidbody2D>();
+
+        if (ballCollider == null)
+            ballCollider = GetComponent<CircleCollider2D>();
+
+        if (ballRigidbody == null)
+            return;
+
+        ballRigidbody.gravityScale = 0f;
+        ballRigidbody.interpolation = RigidbodyInterpolation2D.Interpolate;
+        ballRigidbody.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
     }
 }

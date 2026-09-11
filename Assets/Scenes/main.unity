@@ -2694,7 +2694,7 @@ GameObject:
   - component: {fileID: 2122530578}
   - component: {fileID: 2122530581}
   - component: {fileID: 2122530580}
-  m_Layer: 0
+  m_Layer: 8
   m_Name: Ball
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -2851,6 +2851,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BallScript
   speed: 7.5
+  minimumVerticalComponent: 0.1
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
