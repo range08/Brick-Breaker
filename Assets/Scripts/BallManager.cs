@@ -32,6 +32,7 @@ public class BallManager : MonoBehaviour
     private bool firstLandingSaved;
     private int returnedBallCount;
     private int temporaryFeverBallCount;
+    private int baseVolleyBallCount;
     private Vector2 lastLaunchDirection = Vector2.up;
 
     public int PermanentBallCount => permanentBallCount;
@@ -73,7 +74,8 @@ public class BallManager : MonoBehaviour
 
         returnedBallCount = 0;
         temporaryFeverBallCount = 0;
-        CurrentVolleyCount = permanentBallCount;
+        baseVolleyBallCount = permanentBallCount;
+        CurrentVolleyCount = baseVolleyBallCount;
         firstLandingSaved = false;
         isDragging = false;
         launchSequenceRunning = false;
@@ -110,10 +112,11 @@ public class BallManager : MonoBehaviour
             return 0;
 
         int amount = permanentBallCount;
+        int startPoolIndex = baseVolleyBallCount + temporaryFeverBallCount;
         temporaryFeverBallCount += amount;
         CurrentVolleyCount += amount;
-        EnsurePoolSize(CurrentVolleyCount);
-        StartCoroutine(LaunchAdditionalBalls(amount, lastLaunchDirection));
+        EnsurePoolSize(startPoolIndex + amount);
+        StartCoroutine(LaunchAdditionalBalls(amount, lastLaunchDirection, startPoolIndex));
         return amount;
     }
 
@@ -254,13 +257,18 @@ public class BallManager : MonoBehaviour
             gameManager.NotifyVolleyLaunchSequenceComplete();
     }
 
-    private IEnumerator LaunchAdditionalBalls(int amount, Vector2 direction)
+    private IEnumerator LaunchAdditionalBalls(int amount, Vector2 direction, int startPoolIndex)
     {
         for (int i = 0; i < amount; i++)
         {
-            BallScript ball = FindAvailableBall();
+            int poolIndex = startPoolIndex + i;
 
-            if (ball == null)
+            if (poolIndex >= pooledBalls.Count)
+                yield break;
+
+            BallScript ball = pooledBalls[poolIndex];
+
+            if (ball == null || activeBalls.Contains(ball))
                 yield break;
 
             ball.PrepareForLaunch(nextLaunchPosition);
@@ -306,19 +314,6 @@ public class BallManager : MonoBehaviour
             clone.gameObject.SetActive(false);
             pooledBalls.Add(clone);
         }
-    }
-
-    private BallScript FindAvailableBall()
-    {
-        for (int i = 0; i < pooledBalls.Count; i++)
-        {
-            BallScript ball = pooledBalls[i];
-
-            if (ball != null && !activeBalls.Contains(ball))
-                return ball;
-        }
-
-        return null;
     }
 
     private void OnDestroy()

@@ -32,6 +32,8 @@ public class GameManager : MonoBehaviour
     private TrajectoryPreview trajectoryPreview;
     private TimeController timeController;
     private FeverController feverController;
+    private AudioManager audioManager;
+    private HitEffectPool hitEffectPool;
     private bool gameOver;
     private GameState stateBeforePause = GameState.Aiming;
 
@@ -44,6 +46,8 @@ public class GameManager : MonoBehaviour
     public TrajectoryPreview TrajectoryPreview => trajectoryPreview;
     public TimeController TimeController => timeController;
     public FeverController FeverController => feverController;
+    public AudioManager AudioManager => audioManager;
+    public HitEffectPool HitEffectPool => hitEffectPool;
 
     private void Awake()
     {
@@ -61,6 +65,8 @@ public class GameManager : MonoBehaviour
         trajectoryPreview = GetComponent<TrajectoryPreview>();
         timeController = GetComponent<TimeController>();
         feverController = GetComponent<FeverController>();
+        audioManager = GetComponent<AudioManager>();
+        hitEffectPool = GetComponent<HitEffectPool>();
 
         if (ballManager == null)
             ballManager = gameObject.AddComponent<BallManager>();
@@ -79,6 +85,12 @@ public class GameManager : MonoBehaviour
 
         if (feverController == null)
             feverController = gameObject.AddComponent<FeverController>();
+
+        if (audioManager == null)
+            audioManager = gameObject.AddComponent<AudioManager>();
+
+        if (hitEffectPool == null)
+            hitEffectPool = gameObject.AddComponent<HitEffectPool>();
     }
 
     private void Start()
@@ -96,9 +108,12 @@ public class GameManager : MonoBehaviour
         ballManager.Initialize(this, ball);
         gameHud.Initialize();
         gameHud.SetPauseCallback(TogglePause);
+        gameHud.SetStartCallback(BeginGame);
         timeController.Initialize();
         feverController.Initialize(this);
-        BeginGame();
+        audioManager.Initialize();
+        hitEffectPool.Initialize();
+        PrepareStartScreen();
     }
 
     public void BeginGame()
@@ -106,6 +121,7 @@ public class GameManager : MonoBehaviour
         if (gameOver)
             return;
 
+        gameHud?.HideStartScreen();
         State = GameState.Aiming;
         stateBeforePause = GameState.Aiming;
         timeController.BeginRound();
@@ -152,11 +168,23 @@ public class GameManager : MonoBehaviour
 
     public void NotifyBlockHit(BrickBlock block, Vector2 hitPoint)
     {
+        hitEffectPool?.Play(hitPoint, block != null ? block.VisualColor : Color.white);
+
+        bool wasFeverActive = feverController != null && feverController.IsFeverActive;
         feverController?.RegisterHit();
+
+        if (!wasFeverActive && feverController != null && feverController.IsFeverActive)
+            audioManager?.PlayFeverStart();
+    }
+
+    public void NotifyBlockDestroyed(BrickBlock block)
+    {
+        audioManager?.PlayBlockDestroy();
     }
 
     public void NotifyBonusBallCollected()
     {
+        audioManager?.PlayBonusBall();
         gameHud?.Refresh(Round, ballManager.PermanentBallCount);
     }
 
@@ -170,6 +198,7 @@ public class GameManager : MonoBehaviour
         timeController.SetGameOver();
         ballManager.StopAllBalls();
         feverController.EndRound();
+        audioManager?.PlayGameOver();
         gameHud?.SetPauseVisible(false);
 
         if (gameOverPanel != null)
@@ -201,6 +230,18 @@ public class GameManager : MonoBehaviour
         State = GameState.Pause;
         timeController.SetPaused(true);
         gameHud?.SetPaused(true);
+    }
+
+    private void PrepareStartScreen()
+    {
+        gameOver = false;
+        State = GameState.Start;
+        stateBeforePause = GameState.Aiming;
+        timeController.BeginRound();
+        feverController.BeginRound();
+        ballManager.PrepareForRound();
+        gameHud?.Refresh(Round, ballManager.PermanentBallCount);
+        gameHud?.ShowStartScreen();
     }
 
     private void ResolveSceneReferences()

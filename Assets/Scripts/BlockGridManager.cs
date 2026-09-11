@@ -95,6 +95,9 @@ public class BlockGridManager : MonoBehaviour
     {
         if (block != null)
             activeBlocks.Remove(block);
+
+        if (gameManager != null)
+            gameManager.NotifyBlockDestroyed(block);
     }
 
     public Color GetHpColor(int hitPoints)

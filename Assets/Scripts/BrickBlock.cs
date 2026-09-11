@@ -21,6 +21,7 @@ public class BrickBlock : MonoBehaviour
 
     public int HitPoints => hitPoints;
     public bool IsBonus => isBonus;
+    public Color VisualColor => spriteRenderer != null ? spriteRenderer.color : Color.white;
     public Bounds WorldBounds => boxCollider != null ? boxCollider.bounds : new Bounds(transform.position, Vector3.zero);
 
     private void Awake()
@@ -61,6 +62,7 @@ public class BrickBlock : MonoBehaviour
         if (isBonus)
         {
             isDestroying = true;
+            blockGridManager?.NotifyBlockHit(this, hitPoint);
             blockGridManager?.NotifyBonusCollected(this);
             blockGridManager?.NotifyBlockDestroyed(this);
             StartCoroutine(PlayDestroyAnimation());

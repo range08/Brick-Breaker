@@ -103,6 +103,17 @@ public class BallScript : MonoBehaviour
             ballManager.NotifyBallReturned(this);
     }
 
+    private void OnCollisionEnter2D(Collision2D collision)
+    {
+        if (!isLaunched || isReturning || GameManager.Instance == null)
+            return;
+
+        if (collision.collider.TryGetComponent<BrickBlock>(out _))
+            GameManager.Instance.AudioManager?.PlayBallBlock();
+        else
+            GameManager.Instance.AudioManager?.PlayBallWall();
+    }
+
     public float GetWorldRadius()
     {
         CircleCollider2D circleCollider = GetComponent<CircleCollider2D>();
