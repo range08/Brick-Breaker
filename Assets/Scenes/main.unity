@@ -1733,7 +1733,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bd0767a82a2d4dc4babe58289b2e0eac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BallManager
-  ballTemplate: {fileID: 0}
+  ballTemplate: {fileID: 2122530582}
   permanentBallCount: 1
   launchInterval: 0.08
 --- !u!114 &818322173
@@ -1748,8 +1748,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e94cad5e9b1387f4a84209b54950ebc3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BlockGridManager
-  brickTemplate: {fileID: 0}
-  targetCamera: {fileID: 0}
+  brickTemplate: {fileID: 409998267}
+  targetCamera: {fileID: 519420031}
   columns: 7
   startingRows: 5
   horizontalSpacing: 1.2
