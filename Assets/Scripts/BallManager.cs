@@ -301,7 +301,12 @@ public class BallManager : MonoBehaviour
             activeBalls.Add(ball);
 
             if (i > 0)
-                yield return new WaitForSeconds(launchInterval);
+            {
+                int launchDelayTicks = Mathf.Max(1, Mathf.RoundToInt(launchInterval / Time.fixedDeltaTime));
+
+                for (int tick = 0; tick < launchDelayTicks; tick++)
+                    yield return new WaitForFixedUpdate();
+            }
 
             if (!volleyActive)
             {

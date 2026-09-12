@@ -16,21 +16,21 @@ public class BlockGridManager : MonoBehaviour
     [SerializeField, Range(2, 7)] private int startingRows = 4;
     [SerializeField, Min(0.1f)] private float horizontalSpacing = 1.2f;
     [SerializeField, Min(0.1f)] private float verticalSpacing = 1.2f;
-    [SerializeField] private Vector2 boardOrigin = new(-3.75f, 5.3f);
+    [SerializeField] private Vector2 boardOrigin = new(-3.75f, 4.7f);
     [SerializeField] private bool centerGridOnCamera = true;
 
     [Header("Row Generation")]
-    [SerializeField, Range(0.1f, 1f)] private float rowOccupancy = 0.65f;
-    [SerializeField, Range(1, 7)] private int minimumBlocksPerRow = 4;
+    [SerializeField, Range(0.1f, 1f)] private float rowOccupancy = 0.78f;
+    [SerializeField, Range(1, 7)] private int minimumBlocksPerRow = 5;
 
     [Header("HP Generation")]
     [SerializeField, Min(1)] private int minimumHpAtRoundOne = 1;
-    [SerializeField, Range(0f, 1f)] private float hpGrowthPerRound = 0.25f;
-    [SerializeField, Range(0, 3)] private int hpVariance = 1;
+    [SerializeField, Range(0f, 1f)] private float hpGrowthPerRound = 0.5f;
+    [SerializeField, Range(0, 3)] private int hpVariance = 2;
     [SerializeField, Min(1)] private int maxGeneratedHp = 12;
 
     [Header("Bonus Ball")]
-    [SerializeField, Range(0f, 1f)] private float bonusBlockChance = 0.15f;
+    [SerializeField, Range(0f, 1f)] private float bonusRowChance = 0.25f;
 
     [Header("Dead Line")]
     [Tooltip("Distance above the initial ball launch position used as the block dead line.")]
@@ -52,7 +52,7 @@ public class BlockGridManager : MonoBehaviour
     public float RowOccupancy => rowOccupancy;
     public int MinimumBlocksPerRow => minimumBlocksPerRow;
     public float HpGrowthPerRound => hpGrowthPerRound;
-    public float BonusBlockChance => bonusBlockChance;
+    public float BonusRowChance => bonusRowChance;
     public float BrickWidth => GetWorldBrickWidth();
     public float GridOuterLeft => GetGridStartX() - GetWorldBrickHalfWidth();
     public float GridOuterRight => GetGridStartX() + (columns - 1) * horizontalSpacing + GetWorldBrickHalfWidth();
@@ -126,18 +126,10 @@ public class BlockGridManager : MonoBehaviour
 
     public Color GetHpColor(int hitPoints)
     {
-        float ratio = Mathf.Clamp01(hitPoints / (float)Mathf.Max(1, maxGeneratedHp));
-
-        if (ratio <= 0.25f)
-            return new Color32(0x20, 0xC9, 0x63, 0xFF);
-
-        if (ratio <= 0.5f)
-            return new Color32(0xF2, 0xC9, 0x4C, 0xFF);
-
-        if (ratio <= 0.75f)
-            return new Color32(0xF2, 0x8B, 0x3C, 0xFF);
-
-        return new Color32(0xE9, 0x4B, 0x55, 0xFF);
+        float t = Mathf.InverseLerp(1f, Mathf.Max(1, maxGeneratedHp), hitPoints);
+        Color lowHp = new Color32(0x52, 0xD9, 0x7B, 0xFF);
+        Color highHp = new Color32(0x0B, 0x6B, 0x3A, 0xFF);
+        return Color.Lerp(lowHp, highHp, t);
     }
 
     public bool IsDeadLineCrossed()
@@ -180,13 +172,16 @@ public class BlockGridManager : MonoBehaviour
     private void CreateRow(int row, int round)
     {
         List<int> selectedColumns = GetSelectedColumns();
+        int bonusColumn = Random.value < bonusRowChance
+            ? selectedColumns[Random.Range(0, selectedColumns.Count)]
+            : -1;
 
         for (int i = 0; i < selectedColumns.Count; i++)
         {
             int column = selectedColumns[i];
             float x = GetGridStartX() + column * horizontalSpacing;
             float y = boardOrigin.y - row * verticalSpacing;
-            bool isBonus = Random.value < bonusBlockChance;
+            bool isBonus = column == bonusColumn;
             int minimumHp = GetMinimumHpForCell(x, y, round);
             int hitPoints = isBonus ? 1 : GenerateHp(minimumHp);
 

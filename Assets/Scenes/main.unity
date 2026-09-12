@@ -2424,7 +2424,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BallManager
   ballTemplate: {fileID: 2122530582}
   permanentBallCount: 1
-  launchInterval: 0.05
+  launchInterval: 0.08
   returnAnimationDuration: 0.14
   minimumDragPixels: 35
 --- !u!114 &818322173
@@ -2445,15 +2445,15 @@ MonoBehaviour:
   startingRows: 4
   horizontalSpacing: 1.2
   verticalSpacing: 1.2
-  boardOrigin: {x: -3.75, y: 8}
+  boardOrigin: {x: -3.75, y: 4.7}
   centerGridOnCamera: 1
-  rowOccupancy: 0.65
-  minimumBlocksPerRow: 4
+  rowOccupancy: 0.78
+  minimumBlocksPerRow: 5
   minimumHpAtRoundOne: 1
-  hpGrowthPerRound: 0.25
-  hpVariance: 1
+  hpGrowthPerRound: 0.5
+  hpVariance: 2
   maxGeneratedHp: 12
-  bonusBlockChance: 0.15
+  bonusRowChance: 0.25
   deadLinePaddingFromBottom: 1.5
 --- !u!114 &818322174
 MonoBehaviour:
