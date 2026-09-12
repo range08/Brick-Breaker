@@ -1,3 +1,4 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -25,6 +26,7 @@ public class GameManager : MonoBehaviour
     [SerializeField] private BrickBlock brickTemplate;
     [SerializeField] private GameObject gameOverPanel;
     [SerializeField] private Button restartButton;
+    [SerializeField] private TMP_Text gameOverRoundText;
 
     private BallManager ballManager;
     private BlockGridManager blockGridManager;
@@ -41,14 +43,7 @@ public class GameManager : MonoBehaviour
     public int Round { get; private set; } = 1;
     public bool CanAcceptAim => !gameOver && State == GameState.Aiming;
     public BallManager BallManager => ballManager;
-    public BlockGridManager BlockGridManager => blockGridManager;
-    public GameHud GameHud => gameHud;
-    public TrajectoryPreview TrajectoryPreview => trajectoryPreview;
-    public TimeController TimeController => timeController;
-    public FeverController FeverController => feverController;
     public AudioManager AudioManager => audioManager;
-    public HitEffectPool HitEffectPool => hitEffectPool;
-    public bool IsGameOverPanelVisible => gameOverPanel != null && gameOverPanel.activeSelf;
 
     private void Awake()
     {
@@ -202,6 +197,9 @@ public class GameManager : MonoBehaviour
         audioManager?.PlayGameOver();
         gameHud?.SetPauseVisible(false);
 
+        if (gameOverRoundText != null)
+            gameOverRoundText.text = $"ROUND {Round:00}";
+
         if (gameOverPanel != null)
             gameOverPanel.SetActive(true);
     }
@@ -259,5 +257,8 @@ public class GameManager : MonoBehaviour
 
         if (restartButton == null && gameOverPanel != null)
             restartButton = gameOverPanel.GetComponentInChildren<Button>(true);
+
+        if (gameOverRoundText == null && gameOverPanel != null)
+            gameOverRoundText = gameOverPanel.transform.Find("GameOverCard/GameOverHint")?.GetComponent<TMP_Text>();
     }
 }

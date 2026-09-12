@@ -8,6 +8,10 @@ using UnityEngine.UI;
 /// </summary>
 public class FeverController : MonoBehaviour
 {
+    private const float BorderThickness = 18f;
+    private const float BorderHueOffset = 0.04f;
+    private static readonly float[] CornerHueOffsets = { -0.5f, 0.5f, 1.5f, 2.5f };
+
     [Header("Fever")]
     [SerializeField, Min(1)] private int hitsToActivate = 30;
     [SerializeField, Min(0.01f)] private float borderCycleSpeed = 0.35f;
@@ -16,6 +20,7 @@ public class FeverController : MonoBehaviour
     [SerializeField, Range(0f, 1f)] private float borderAlpha = 0.8f;
 
     private readonly Image[] borderImages = new Image[4];
+    private readonly Image[] cornerImages = new Image[4];
     private BallManager ballManager;
     private RectTransform borderParent;
     private GameObject borderObject;
@@ -88,16 +93,12 @@ public class FeverController : MonoBehaviour
             return;
 
         hue = Mathf.Repeat(hue + Time.deltaTime * borderCycleSpeed, 1f);
-        Color baseColor = Color.HSVToRGB(hue, borderSaturation, borderValue);
-        baseColor.a = borderAlpha;
 
         for (int i = 0; i < borderImages.Length; i++)
-        {
-            float shiftedHue = Mathf.Repeat(hue + i * 0.12f, 1f);
-            Color edgeColor = Color.HSVToRGB(shiftedHue, borderSaturation, borderValue);
-            edgeColor.a = borderAlpha;
-            borderImages[i].color = i == 0 ? baseColor : edgeColor;
-        }
+            borderImages[i].color = GetBorderColor(hue + i * BorderHueOffset);
+
+        for (int i = 0; i < cornerImages.Length; i++)
+            cornerImages[i].color = GetBorderColor(hue + CornerHueOffsets[i] * BorderHueOffset);
     }
 
     private void CreateBorder()
@@ -128,15 +129,20 @@ public class FeverController : MonoBehaviour
         borderRect.offsetMin = Vector2.zero;
         borderRect.offsetMax = Vector2.zero;
 
-        CreateEdge(borderObject.transform, 0, "Top", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, 18f), Vector2.zero);
-        CreateEdge(borderObject.transform, 1, "Bottom", new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 18f), Vector2.zero);
-        CreateEdge(borderObject.transform, 2, "Left", new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(0f, 0.5f), new Vector2(18f, 0f), Vector2.zero);
-        CreateEdge(borderObject.transform, 3, "Right", new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(1f, 0.5f), new Vector2(18f, 0f), Vector2.zero);
+        borderImages[0] = CreateBorderImage(borderObject.transform, "Top", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(-BorderThickness * 2f, BorderThickness));
+        borderImages[1] = CreateBorderImage(borderObject.transform, "Right", new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(1f, 0.5f), new Vector2(BorderThickness, -BorderThickness * 2f));
+        borderImages[2] = CreateBorderImage(borderObject.transform, "Bottom", new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), new Vector2(-BorderThickness * 2f, BorderThickness));
+        borderImages[3] = CreateBorderImage(borderObject.transform, "Left", new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(0f, 0.5f), new Vector2(BorderThickness, -BorderThickness * 2f));
+
+        cornerImages[0] = CreateBorderImage(borderObject.transform, "TopLeft", new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f), Vector2.one * BorderThickness);
+        cornerImages[1] = CreateBorderImage(borderObject.transform, "TopRight", new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f), Vector2.one * BorderThickness);
+        cornerImages[2] = CreateBorderImage(borderObject.transform, "BottomRight", new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f), Vector2.one * BorderThickness);
+        cornerImages[3] = CreateBorderImage(borderObject.transform, "BottomLeft", new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0f, 0f), Vector2.one * BorderThickness);
 
         SetBorderVisible(false);
     }
 
-    private void CreateEdge(Transform parent, int index, string objectName, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot, Vector2 sizeDelta, Vector2 anchoredPosition)
+    private Image CreateBorderImage(Transform parent, string objectName, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot, Vector2 sizeDelta)
     {
         Transform existing = parent.Find(objectName);
         GameObject edgeObject = existing != null
@@ -151,12 +157,19 @@ public class FeverController : MonoBehaviour
         edgeRect.anchorMax = anchorMax;
         edgeRect.pivot = pivot;
         edgeRect.sizeDelta = sizeDelta;
-        edgeRect.anchoredPosition = anchoredPosition;
+        edgeRect.anchoredPosition = Vector2.zero;
 
         Image image = edgeObject.GetComponent<Image>();
         image.raycastTarget = false;
         image.color = Color.clear;
-        borderImages[index] = image;
+        return image;
+    }
+
+    private Color GetBorderColor(float targetHue)
+    {
+        Color color = Color.HSVToRGB(Mathf.Repeat(targetHue, 1f), borderSaturation, borderValue);
+        color.a = borderAlpha;
+        return color;
     }
 
     private void SetBorderVisible(bool visible)

@@ -18,11 +18,6 @@ public class BallScript : MonoBehaviour
     private bool isLaunched;
     private bool isReturning;
 
-    public bool IsLaunched => isLaunched;
-    public bool HasReturned => isReturning;
-    public float Speed => speed;
-    public Vector2 Velocity => ballRigidbody != null ? ballRigidbody.linearVelocity : Vector2.zero;
-
     private void Awake()
     {
         CachePhysicsComponents();
@@ -54,11 +49,6 @@ public class BallScript : MonoBehaviour
         SetPhysicsEnabled(false);
     }
 
-    public void PrepareForLaunch()
-    {
-        PrepareForLaunch(launchPosition);
-    }
-
     public void PrepareForLaunch(Vector3 position)
     {
         launchPosition = position;
@@ -76,12 +66,6 @@ public class BallScript : MonoBehaviour
     {
         PrepareForLaunch(position);
         gameObject.SetActive(true);
-    }
-
-    public void SetLaunchPosition(Vector3 position)
-    {
-        launchPosition = position;
-        PrepareForLaunch(position);
     }
 
     public void Launch(Vector2 direction)
@@ -106,6 +90,18 @@ public class BallScript : MonoBehaviour
         launchPosition = position;
         transform.position = position;
         gameObject.SetActive(false);
+    }
+
+    public void HoldAtLaunchPosition(Vector3 position)
+    {
+        launchPosition = position;
+        transform.position = position;
+        gameObject.SetActive(true);
+    }
+
+    public void SetReturnPosition(Vector3 position)
+    {
+        transform.position = position;
     }
 
     public void NotifyDeathZone()
@@ -142,14 +138,12 @@ public class BallScript : MonoBehaviour
 
     public float GetWorldRadius()
     {
-        CircleCollider2D circleCollider = GetComponent<CircleCollider2D>();
-
-        if (circleCollider == null)
+        if (ballCollider == null)
             return 0.25f;
 
         Vector3 scale = transform.lossyScale;
         float scaleFactor = Mathf.Max(Mathf.Abs(scale.x), Mathf.Abs(scale.y));
-        return circleCollider.radius * scaleFactor;
+        return ballCollider.radius * scaleFactor;
     }
 
     private void OnDisable()

@@ -37,7 +37,7 @@ public class GameHud : MonoBehaviour
     public void Refresh(int round, int permanentBallCount)
     {
         if (roundText != null)
-            roundText.text = $"ROUND {round:00}";
+            roundText.text = round.ToString();
 
         if (ballCountText != null)
             ballCountText.text = $"BALLS {permanentBallCount:00}";

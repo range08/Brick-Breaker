@@ -19,6 +19,9 @@ public class BallManager : MonoBehaviour
     [Header("Volley")]
     [SerializeField, Range(0.05f, 0.2f)] private float launchInterval = 0.08f;
 
+    [Header("Ball Return")]
+    [SerializeField, Range(0.1f, 0.18f)] private float returnAnimationDuration = 0.14f;
+
     [Header("Aim Input")]
     [SerializeField, Min(0f)] private float minimumDragPixels = 35f;
 
@@ -39,25 +42,17 @@ public class BallManager : MonoBehaviour
     private int temporaryFeverBallCount;
     private int baseVolleyBallCount;
     private int pendingLaunchCount;
-    private int launchedBallCount;
     private int ballLayer = -1;
     private Vector2 lastLaunchDirection = Vector2.up;
+    private BallScript readyBall;
     private bool pointerGestureActive;
     private bool pointerGestureStartedOverUI;
     private bool activePointerIsTouch;
 
     public int PermanentBallCount => permanentBallCount;
-    public int ActiveBallCount => activeBalls.Count;
-    public int ReturnedBallCount => returnedBallCount;
-    public int LaunchedBallCount => launchedBallCount;
     public int CurrentVolleyCount { get; private set; }
-    public int TemporaryFeverBallCount => temporaryFeverBallCount;
     public bool IsVolleyActive => volleyActive;
-    public bool IsLaunchSequenceRunning => launchSequenceRunning;
     public Vector3 NextLaunchPosition => nextLaunchPosition;
-    public Vector2 LastLaunchDirection => lastLaunchDirection;
-    public IReadOnlyList<BallScript> ActiveBalls => activeBalls;
-    public Vector2 AimOrigin => nextLaunchPosition;
     public float BallRadius => ballTemplate != null ? ballTemplate.GetWorldRadius() : 0.25f;
 
     public void Initialize(GameManager owner, BallScript template)
@@ -95,7 +90,6 @@ public class BallManager : MonoBehaviour
         launchSequenceRunning = false;
         volleyActive = false;
         pendingLaunchCount = 0;
-        launchedBallCount = 0;
         pointerGestureActive = false;
         pointerGestureStartedOverUI = false;
         activePointerIsTouch = false;
@@ -110,8 +104,14 @@ public class BallManager : MonoBehaviour
             ball.PrepareForLaunch(nextLaunchPosition);
         }
 
-        if (pooledBalls.Count > 0)
-            pooledBalls[0].ShowReadyForAim(nextLaunchPosition);
+        BallScript ballToShow = readyBall;
+        if (ballToShow == null && pooledBalls.Count > 0)
+            ballToShow = pooledBalls[0];
+
+        if (ballToShow != null)
+            ballToShow.ShowReadyForAim(nextLaunchPosition);
+
+        readyBall = null;
     }
 
     public void SetNextLaunchPosition(Vector3 position)
@@ -140,7 +140,7 @@ public class BallManager : MonoBehaviour
         EnsurePoolSize(startPoolIndex + amount);
         pendingLaunchCount += amount;
         launchSequenceRunning = true;
-        StartCoroutine(LaunchAdditionalBalls(amount, lastLaunchDirection, startPoolIndex));
+        StartCoroutine(LaunchBalls(startPoolIndex, amount, lastLaunchDirection, false));
         return amount;
     }
 
@@ -160,7 +160,17 @@ public class BallManager : MonoBehaviour
             return false;
 
         trajectoryPreview?.Clear();
-        StartCoroutine(LaunchVolley(direction));
+        lastLaunchDirection = direction;
+        launchSequenceRunning = true;
+        volleyActive = true;
+        returnedBallCount = 0;
+        firstLandingSaved = false;
+        activeBalls.Clear();
+
+        int volleyCount = CurrentVolleyCount;
+        EnsurePoolSize(volleyCount);
+        pendingLaunchCount = volleyCount;
+        StartCoroutine(LaunchBalls(0, volleyCount, direction, true));
         return true;
     }
 
@@ -173,14 +183,17 @@ public class BallManager : MonoBehaviour
         {
             firstLandingSaved = true;
             SetNextLaunchPosition(new Vector3(ball.transform.position.x, nextLaunchPosition.y, 0f));
+            readyBall = ball;
+            ball.HoldAtLaunchPosition(nextLaunchPosition);
+            activeBalls.Remove(ball);
+        }
+        else
+        {
+            StartCoroutine(GatherBall(ball));
         }
 
         returnedBallCount++;
-        activeBalls.Remove(ball);
-        ball.StopAndReturn(nextLaunchPosition);
-
-        if (returnedBallCount >= CurrentVolleyCount && !launchSequenceRunning && activeBalls.Count == 0)
-            CompleteVolley();
+        TryCompleteVolley();
     }
 
     public void StopAllBalls()
@@ -198,7 +211,6 @@ public class BallManager : MonoBehaviour
         activeBalls.Clear();
         launchSequenceRunning = false;
         pendingLaunchCount = 0;
-        launchedBallCount = 0;
         volleyActive = false;
         isDragging = false;
         pointerGestureActive = false;
@@ -265,23 +277,19 @@ public class BallManager : MonoBehaviour
         }
     }
 
-    private IEnumerator LaunchVolley(Vector2 direction)
+    private IEnumerator LaunchBalls(int startPoolIndex, int count, Vector2 direction, bool notifySequenceComplete)
     {
-        lastLaunchDirection = direction;
-        launchSequenceRunning = true;
-        volleyActive = true;
-        returnedBallCount = 0;
-        firstLandingSaved = false;
-        activeBalls.Clear();
-        int volleyCount = CurrentVolleyCount;
-
-        EnsurePoolSize(volleyCount);
-        pendingLaunchCount = volleyCount;
-        launchedBallCount = 0;
-
-        for (int i = 0; i < volleyCount; i++)
+        for (int i = 0; i < count; i++)
         {
-            BallScript ball = pooledBalls[i];
+            int poolIndex = startPoolIndex + i;
+
+            if (poolIndex >= pooledBalls.Count)
+            {
+                SkipPendingLaunches(count - i);
+                yield break;
+            }
+
+            BallScript ball = pooledBalls[poolIndex];
 
             if (ball == null || activeBalls.Contains(ball))
             {
@@ -297,13 +305,12 @@ public class BallManager : MonoBehaviour
 
             if (!volleyActive)
             {
-                SkipPendingLaunches(volleyCount - i);
+                SkipPendingLaunches(count - i);
                 yield break;
             }
 
             ball.Launch(direction);
             pendingLaunchCount = Mathf.Max(0, pendingLaunchCount - 1);
-            launchedBallCount++;
 
             if (gameManager != null)
                 gameManager.NotifyBallLaunched(ball);
@@ -313,53 +320,32 @@ public class BallManager : MonoBehaviour
 
         TryFinishLaunchSequence();
 
-        if (gameManager != null)
+        if (notifySequenceComplete && gameManager != null)
             gameManager.NotifyVolleyLaunchSequenceComplete();
     }
 
-    private IEnumerator LaunchAdditionalBalls(int amount, Vector2 direction, int startPoolIndex)
+    private IEnumerator GatherBall(BallScript ball)
     {
-        for (int i = 0; i < amount; i++)
+        Vector3 returnStart = ball.transform.position;
+        float elapsed = 0f;
+
+        while (elapsed < returnAnimationDuration)
         {
-            int poolIndex = startPoolIndex + i;
-
-            if (poolIndex >= pooledBalls.Count)
-            {
-                SkipPendingLaunches(amount - i);
-                yield break;
-            }
-
-            BallScript ball = pooledBalls[poolIndex];
-
-            if (ball == null || activeBalls.Contains(ball))
-            {
-                SkipPendingLaunches(amount - i);
-                yield break;
-            }
-
-            ball.PrepareForLaunch(nextLaunchPosition);
-            activeBalls.Add(ball);
-
-            if (i > 0)
-                yield return new WaitForSeconds(launchInterval);
-
-            if (!volleyActive)
-            {
-                SkipPendingLaunches(amount - i);
-                yield break;
-            }
-
-            ball.Launch(direction);
-            pendingLaunchCount = Mathf.Max(0, pendingLaunchCount - 1);
-            launchedBallCount++;
-
-            if (gameManager != null)
-                gameManager.NotifyBallLaunched(ball);
-
-            TryFinishLaunchSequence();
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / returnAnimationDuration);
+            ball.SetReturnPosition(Vector3.Lerp(returnStart, nextLaunchPosition, t));
+            yield return null;
         }
 
-        TryFinishLaunchSequence();
+        ball.StopAndReturn(nextLaunchPosition);
+        activeBalls.Remove(ball);
+        TryCompleteVolley();
+    }
+
+    private void TryCompleteVolley()
+    {
+        if (returnedBallCount >= CurrentVolleyCount && !launchSequenceRunning && activeBalls.Count == 0)
+            CompleteVolley();
     }
 
     private void CompleteVolley()
@@ -369,11 +355,19 @@ public class BallManager : MonoBehaviour
         launchSequenceRunning = false;
         pendingLaunchCount = 0;
 
+        int readyBallIndex = pooledBalls.IndexOf(readyBall);
+        if (readyBallIndex > 0)
+        {
+            BallScript firstPoolBall = pooledBalls[0];
+            pooledBalls[0] = readyBall;
+            pooledBalls[readyBallIndex] = firstPoolBall;
+        }
+
         for (int i = 0; i < pooledBalls.Count; i++)
         {
             BallScript ball = pooledBalls[i];
 
-            if (ball != null)
+            if (ball != null && ball != readyBall)
                 ball.StopAndReturn(nextLaunchPosition);
         }
 
