@@ -19,6 +19,9 @@ public class BallManager : MonoBehaviour
     [Header("Volley")]
     [SerializeField, Range(0.05f, 0.2f)] private float launchInterval = 0.08f;
 
+    [Header("Aim Input")]
+    [SerializeField, Min(0f)] private float minimumDragPixels = 35f;
+
     private readonly List<BallScript> pooledBalls = new();
     private readonly List<BallScript> activeBalls = new();
     private readonly List<RaycastResult> uiRaycastResults = new();
@@ -227,9 +230,6 @@ public class BallManager : MonoBehaviour
             Vector2 targetWorldPosition = worldCamera.ScreenToWorldPoint(releasedPosition);
             Vector2 direction = targetWorldPosition - (Vector2)nextLaunchPosition;
 
-            if ((releasedPosition - dragStartScreenPosition).sqrMagnitude < GetMinimumDragPixelsSquared())
-                return;
-
             TryLaunch(direction);
             return;
         }
@@ -260,6 +260,8 @@ public class BallManager : MonoBehaviour
 
             if ((pointerPosition - dragStartScreenPosition).sqrMagnitude >= GetMinimumDragPixelsSquared())
                 trajectoryPreview?.Draw(nextLaunchPosition, previewDirection, BallRadius);
+            else
+                trajectoryPreview?.Clear();
         }
     }
 
@@ -437,7 +439,7 @@ public class BallManager : MonoBehaviour
 
     private float GetMinimumDragPixelsSquared()
     {
-        return 35f * 35f;
+        return minimumDragPixels * minimumDragPixels;
     }
 
     private static bool TryGetPointerPosition(bool isTouch, out Vector2 screenPosition)
