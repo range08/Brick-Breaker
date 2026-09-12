@@ -2447,13 +2447,13 @@ MonoBehaviour:
   verticalSpacing: 1.2
   boardOrigin: {x: -3.75, y: 4.7}
   centerGridOnCamera: 1
-  rowOccupancy: 0.78
-  minimumBlocksPerRow: 5
+  rowOccupancy: 0.72
+  minimumBlocksPerRow: 4
   minimumHpAtRoundOne: 1
-  hpGrowthPerRound: 0.5
-  hpVariance: 2
+  hpGrowthPerRound: 0.35
+  hpVariance: 1
   maxGeneratedHp: 12
-  bonusRowChance: 0.25
+  bonusRowChance: 0.3
   deadLinePaddingFromBottom: 1.5
 --- !u!114 &818322174
 MonoBehaviour:

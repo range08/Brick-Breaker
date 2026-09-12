@@ -20,17 +20,17 @@ public class BlockGridManager : MonoBehaviour
     [SerializeField] private bool centerGridOnCamera = true;
 
     [Header("Row Generation")]
-    [SerializeField, Range(0.1f, 1f)] private float rowOccupancy = 0.78f;
-    [SerializeField, Range(1, 7)] private int minimumBlocksPerRow = 5;
+    [SerializeField, Range(0.1f, 1f)] private float rowOccupancy = 0.72f;
+    [SerializeField, Range(1, 7)] private int minimumBlocksPerRow = 4;
 
     [Header("HP Generation")]
     [SerializeField, Min(1)] private int minimumHpAtRoundOne = 1;
-    [SerializeField, Range(0f, 1f)] private float hpGrowthPerRound = 0.5f;
-    [SerializeField, Range(0, 3)] private int hpVariance = 2;
+    [SerializeField, Range(0f, 1f)] private float hpGrowthPerRound = 0.35f;
+    [SerializeField, Range(0, 3)] private int hpVariance = 1;
     [SerializeField, Min(1)] private int maxGeneratedHp = 12;
 
     [Header("Bonus Ball")]
-    [SerializeField, Range(0f, 1f)] private float bonusRowChance = 0.25f;
+    [SerializeField, Range(0f, 1f)] private float bonusRowChance = 0.30f;
 
     [Header("Dead Line")]
     [Tooltip("Distance above the initial ball launch position used as the block dead line.")]
