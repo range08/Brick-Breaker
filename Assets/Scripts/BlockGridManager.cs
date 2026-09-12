@@ -13,14 +13,19 @@ public class BlockGridManager : MonoBehaviour
 
     [Header("Grid")]
     [SerializeField, Range(3, 8)] private int columns = 7;
-    [SerializeField, Range(2, 7)] private int startingRows = 5;
+    [SerializeField, Range(2, 7)] private int startingRows = 4;
     [SerializeField, Min(0.1f)] private float horizontalSpacing = 1.2f;
     [SerializeField, Min(0.1f)] private float verticalSpacing = 1.2f;
     [SerializeField] private Vector2 boardOrigin = new(-3.75f, 5.3f);
+    [SerializeField] private bool centerGridOnCamera = true;
+
+    [Header("Row Generation")]
+    [SerializeField, Range(0.1f, 1f)] private float rowOccupancy = 0.65f;
+    [SerializeField, Range(1, 7)] private int minimumBlocksPerRow = 4;
 
     [Header("HP Generation")]
     [SerializeField, Min(1)] private int minimumHpAtRoundOne = 1;
-    [SerializeField, Range(0f, 1f)] private float hpGrowthPerRound = 0.35f;
+    [SerializeField, Range(0f, 1f)] private float hpGrowthPerRound = 0.25f;
     [SerializeField, Range(0, 3)] private int hpVariance = 1;
     [SerializeField, Min(1)] private int maxGeneratedHp = 12;
 
@@ -42,6 +47,15 @@ public class BlockGridManager : MonoBehaviour
     public float DeadLineY => GetDeadLineY();
     public IReadOnlyList<BrickBlock> ActiveBlocks => activeBlocks;
     public int HpVariance => hpVariance;
+    public int Columns => columns;
+    public float HorizontalSpacing => horizontalSpacing;
+    public float RowOccupancy => rowOccupancy;
+    public int MinimumBlocksPerRow => minimumBlocksPerRow;
+    public float HpGrowthPerRound => hpGrowthPerRound;
+    public float BonusBlockChance => bonusBlockChance;
+    public float BrickWidth => GetWorldBrickWidth();
+    public float GridOuterLeft => GetGridStartX() - GetWorldBrickHalfWidth();
+    public float GridOuterRight => GetGridStartX() + (columns - 1) * horizontalSpacing + GetWorldBrickHalfWidth();
 
     public void Initialize(GameManager owner, BrickBlock template)
     {
@@ -165,9 +179,12 @@ public class BlockGridManager : MonoBehaviour
 
     private void CreateRow(int row, int round)
     {
-        for (int column = 0; column < columns; column++)
+        List<int> selectedColumns = GetSelectedColumns();
+
+        for (int i = 0; i < selectedColumns.Count; i++)
         {
-            float x = boardOrigin.x + column * horizontalSpacing;
+            int column = selectedColumns[i];
+            float x = GetGridStartX() + column * horizontalSpacing;
             float y = boardOrigin.y - row * verticalSpacing;
             bool isBonus = Random.value < bonusBlockChance;
             int minimumHp = GetMinimumHpForCell(x, y, round);
@@ -182,35 +199,79 @@ public class BlockGridManager : MonoBehaviour
         }
     }
 
-    private int GetMinimumHpForCell(float x, float y, int round)
+    private List<int> GetSelectedColumns()
     {
-        int minimumHp = GetRoundMinimumHp(round);
-        float nearestBelowY = float.MinValue;
-        BrickBlock nearestBelow = null;
+        int safeColumnCount = Mathf.Max(1, columns);
+        int minimumCount = Mathf.Clamp(minimumBlocksPerRow, 1, safeColumnCount);
+        int maximumCount = Mathf.Max(minimumCount, safeColumnCount - 1);
+        float exactCount = safeColumnCount * Mathf.Clamp01(rowOccupancy);
+        int lowerCount = Mathf.FloorToInt(exactCount);
+        int upperCount = Mathf.CeilToInt(exactCount);
+        int targetCount = lowerCount == upperCount
+            ? lowerCount
+            : Random.value < exactCount - lowerCount ? upperCount : lowerCount;
+        targetCount = Mathf.Clamp(targetCount, minimumCount, maximumCount);
 
-        for (int i = 0; i < activeBlocks.Count; i++)
+        List<int> availableColumns = new(safeColumnCount);
+
+        for (int column = 0; column < safeColumnCount; column++)
+            availableColumns.Add(column);
+
+        for (int i = 0; i < targetCount; i++)
         {
-            BrickBlock candidate = activeBlocks[i];
-
-            if (candidate == null || candidate.IsBonus)
-                continue;
-
-            Vector3 candidatePosition = candidate.transform.position;
-
-            if (Mathf.Abs(candidatePosition.x - x) > horizontalSpacing * 0.25f || candidatePosition.y >= y)
-                continue;
-
-            if (candidatePosition.y > nearestBelowY)
-            {
-                nearestBelowY = candidatePosition.y;
-                nearestBelow = candidate;
-            }
+            int swapIndex = Random.Range(i, availableColumns.Count);
+            (availableColumns[i], availableColumns[swapIndex]) =
+                (availableColumns[swapIndex], availableColumns[i]);
         }
 
-        if (nearestBelow != null)
-            minimumHp = Mathf.Max(minimumHp, nearestBelow.HitPoints);
+        if (availableColumns.Count > targetCount)
+            availableColumns.RemoveRange(targetCount, availableColumns.Count - targetCount);
 
-        return minimumHp;
+        return availableColumns;
+    }
+
+    private int GetMinimumHpForCell(float x, float y, int round)
+    {
+        // Do not carry HP upward from the row below. That made a fresh
+        // five-row board ramp from 1 HP to 5+ HP before the first volley.
+        // Round progression now controls the floor and hpVariance supplies
+        // the small amount of local variety.
+        return GetRoundMinimumHp(round);
+    }
+
+    public float GetGridStartX()
+    {
+        float totalWidth = Mathf.Max(0, columns - 1) * horizontalSpacing;
+        float centerX = centerGridOnCamera && targetCamera != null
+            ? targetCamera.transform.position.x
+            : boardOrigin.x + totalWidth * 0.5f;
+        return centerX - totalWidth * 0.5f;
+    }
+
+    public float GetLeftGameplayBoundary(float padding)
+    {
+        return GridOuterLeft - Mathf.Max(0f, padding);
+    }
+
+    public float GetRightGameplayBoundary(float padding)
+    {
+        return GridOuterRight + Mathf.Max(0f, padding);
+    }
+
+    private float GetWorldBrickWidth()
+    {
+        if (brickTemplate == null)
+            return 1f;
+
+        BoxCollider2D collider = brickTemplate.GetComponent<BoxCollider2D>();
+        Vector3 scale = brickTemplate.transform.lossyScale;
+        float localWidth = collider != null ? collider.size.x : 1f;
+        return Mathf.Abs(localWidth * scale.x);
+    }
+
+    private float GetWorldBrickHalfWidth()
+    {
+        return GetWorldBrickWidth() * 0.5f;
     }
 
     private int GenerateHp(int minimumHp)
