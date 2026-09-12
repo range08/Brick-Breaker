@@ -2,8 +2,8 @@
 
 Unity로 제작한 **모바일 세로형 2D 블록 브레이커 게임**입니다. 단순한 블록 깨기 구조를 라운드 기반 멀티볼 게임으로 확장하고, 조준·물리·공 회수·난이도·UI 흐름을 실제 플레이 테스트를 통해 반복 개선했습니다.
 
-> **Portfolio build**: [`feature/round-system`](https://github.com/range08/Brick-Breaker/tree/feature/round-system)  
-> **Reference commit**: [`e544791`](https://github.com/range08/Brick-Breaker/commit/e5447913fec3805ca31550179fa6aa3603998fbd)
+> **Portfolio build**: [`main`](https://github.com/range08/Brick-Breaker/tree/main)  
+> **Merged gameplay commit**: [`7f47c9a`](https://github.com/range08/Brick-Breaker/commit/7f47c9a46570188335a0e5f3da34920a85ce57b4)
 
 ## Overview
 
@@ -145,7 +145,6 @@ Unity로 제작한 **모바일 세로형 2D 블록 브레이커 게임**입니�
 ```bash
 git clone https://github.com/range08/Brick-Breaker.git
 cd Brick-Breaker
-git checkout feature/round-system
 ```
 
 1. Unity Hub에서 **Unity 6.3 LTS**로 프로젝트를 엽니다.
@@ -154,7 +153,7 @@ git checkout feature/round-system
 
 ## Repository Status
 
-`main`은 프로젝트의 안정적인 기준 브랜치이며, 현재 포트폴리오 제출 기준 구현은 `feature/round-system` 브랜치에 있습니다. 제출 이후 추가 개선과 정리를 계속 진행할 예정입니다.
+`main`이 현재 포트폴리오 제출 기준이자 최신 안정 브랜치입니다. 기능 개발 브랜치는 `main`으로 병합되었으며, 이후 개선은 새 작업 브랜치에서 진행합니다.
 
 ---
 
