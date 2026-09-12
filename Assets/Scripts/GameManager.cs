@@ -1,12 +1,21 @@
-using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
+public enum GameState
+{
+    Start,
+    Aiming,
+    Playing,
+    RoundEnd,
+    GameOver,
+    Pause
+}
+
 /// <summary>
-/// Owns the small one-ball game loop: board creation, score, turns, lives,
-/// UI updates and restart handling.
+/// Owns global game state and moves the game from one completed volley to the
+/// next round. Feature-specific work is delegated to the managers on this object.
 /// </summary>
 public class GameManager : MonoBehaviour
 {
@@ -15,28 +24,26 @@ public class GameManager : MonoBehaviour
     [Header("Scene References")]
     [SerializeField] private BallScript ball;
     [SerializeField] private BrickBlock brickTemplate;
-    [SerializeField] private TMP_Text scoreText;
     [SerializeField] private GameObject gameOverPanel;
     [SerializeField] private Button restartButton;
+    [SerializeField] private TMP_Text gameOverRoundText;
 
-    [Header("Board")]
-    [SerializeField, Range(3, 8)] private int columns = 7;
-    [SerializeField, Range(2, 7)] private int rows = 5;
-    [SerializeField, Min(0.1f)] private float horizontalSpacing = 1.25f;
-    [SerializeField, Min(0.1f)] private float verticalSpacing = 0.82f;
-    [SerializeField] private Vector2 boardOrigin = new Vector2(-3.75f, 5.3f);
-    [SerializeField, Min(1)] private int startingLives = 3;
-
-    private readonly List<BrickBlock> activeBricks = new();
-    private int score;
-    private int turn = 1;
-    private int lives;
-    private int stage = 1;
+    private BallManager ballManager;
+    private BlockGridManager blockGridManager;
+    private GameHud gameHud;
+    private TrajectoryPreview trajectoryPreview;
+    private TimeController timeController;
+    private FeverController feverController;
+    private AudioManager audioManager;
+    private HitEffectPool hitEffectPool;
     private bool gameOver;
+    private GameState stateBeforePause = GameState.Aiming;
 
-    public int Score => score;
-    public int Turn => turn;
-    public int Lives => lives;
+    public GameState State { get; private set; } = GameState.Start;
+    public int Round { get; private set; } = 1;
+    public bool CanAcceptAim => !gameOver && State == GameState.Aiming;
+    public BallManager BallManager => ballManager;
+    public AudioManager AudioManager => audioManager;
 
     private void Awake()
     {
@@ -48,13 +55,43 @@ public class GameManager : MonoBehaviour
 
         Instance = this;
         Application.targetFrameRate = 60;
-        lives = startingLives;
+        ballManager = GetComponent<BallManager>();
+        blockGridManager = GetComponent<BlockGridManager>();
+        gameHud = GetComponent<GameHud>();
+        trajectoryPreview = GetComponent<TrajectoryPreview>();
+        timeController = GetComponent<TimeController>();
+        feverController = GetComponent<FeverController>();
+        audioManager = GetComponent<AudioManager>();
+        hitEffectPool = GetComponent<HitEffectPool>();
+
+        if (ballManager == null)
+            ballManager = gameObject.AddComponent<BallManager>();
+
+        if (blockGridManager == null)
+            blockGridManager = gameObject.AddComponent<BlockGridManager>();
+
+        if (gameHud == null)
+            gameHud = gameObject.AddComponent<GameHud>();
+
+        if (trajectoryPreview == null)
+            trajectoryPreview = gameObject.AddComponent<TrajectoryPreview>();
+
+        if (timeController == null)
+            timeController = gameObject.AddComponent<TimeController>();
+
+        if (feverController == null)
+            feverController = gameObject.AddComponent<FeverController>();
+
+        if (audioManager == null)
+            audioManager = gameObject.AddComponent<AudioManager>();
+
+        if (hitEffectPool == null)
+            hitEffectPool = gameObject.AddComponent<HitEffectPool>();
     }
 
     private void Start()
     {
         ResolveSceneReferences();
-        BuildBoard();
 
         if (restartButton != null)
             restartButton.onClick.AddListener(RestartGame);
@@ -62,10 +99,149 @@ public class GameManager : MonoBehaviour
         if (gameOverPanel != null)
             gameOverPanel.SetActive(false);
 
-        UpdateHud();
+        blockGridManager.Initialize(this, brickTemplate);
+        blockGridManager.BuildInitialGrid(Round);
+        ballManager.Initialize(this, ball);
+        gameHud.Initialize();
+        gameHud.SetPauseCallback(TogglePause);
+        gameHud.SetStartCallback(BeginGame);
+        timeController.Initialize();
+        feverController.Initialize(this);
+        audioManager.Initialize();
+        hitEffectPool.Initialize();
+        PrepareStartScreen();
+    }
 
-        if (ball != null)
-            ball.PrepareForLaunch();
+    public void BeginGame()
+    {
+        if (gameOver)
+            return;
+
+        gameHud?.HideStartScreen();
+        State = GameState.Aiming;
+        stateBeforePause = GameState.Aiming;
+        timeController.BeginRound();
+        feverController.BeginRound();
+        ballManager.PrepareForRound();
+        gameHud?.Refresh(Round, ballManager.PermanentBallCount);
+        gameHud?.SetPauseVisible(true);
+        gameHud?.SetPaused(false);
+    }
+
+    public void NotifyBallLaunched(BallScript launchedBall)
+    {
+        if (!gameOver)
+        {
+            State = GameState.Playing;
+            timeController.BeginFlight();
+        }
+    }
+
+    public void NotifyVolleyLaunchSequenceComplete()
+    {
+        if (!gameOver)
+            State = GameState.Playing;
+    }
+
+    public void NotifyAllBallsReturned(Vector3 nextLaunchPosition)
+    {
+        if (gameOver)
+            return;
+
+        State = GameState.RoundEnd;
+        timeController.EndRound();
+        feverController.EndRound();
+        Round++;
+
+        if (!blockGridManager.AdvanceGrid(Round))
+        {
+            TriggerGameOver();
+            return;
+        }
+
+        BeginGame();
+    }
+
+    public void NotifyBlockHit(BrickBlock block, Vector2 hitPoint)
+    {
+        hitEffectPool?.Play(hitPoint, block != null ? block.VisualColor : Color.white);
+
+        bool wasFeverActive = feverController != null && feverController.IsFeverActive;
+        feverController?.RegisterHit();
+
+        if (!wasFeverActive && feverController != null && feverController.IsFeverActive)
+            audioManager?.PlayFeverStart();
+    }
+
+    public void NotifyBlockDestroyed(BrickBlock block)
+    {
+        audioManager?.PlayBlockDestroy();
+    }
+
+    public void NotifyBonusBallCollected()
+    {
+        audioManager?.PlayBonusBall();
+        gameHud?.Refresh(Round, ballManager.PermanentBallCount);
+    }
+
+    public void TriggerGameOver()
+    {
+        if (gameOver)
+            return;
+
+        gameOver = true;
+        State = GameState.GameOver;
+        timeController.SetGameOver();
+        ballManager.StopAllBalls();
+        feverController.EndRound();
+        audioManager?.PlayGameOver();
+        gameHud?.SetPauseVisible(false);
+
+        if (gameOverRoundText != null)
+            gameOverRoundText.text = $"ROUND {Round:00}";
+
+        if (gameOverPanel != null)
+            gameOverPanel.SetActive(true);
+    }
+
+    public void RestartGame()
+    {
+        timeController?.SetGameOver();
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+    }
+
+    public void TogglePause()
+    {
+        if (gameOver)
+            return;
+
+        if (State == GameState.Pause)
+        {
+            State = stateBeforePause;
+            timeController.SetPaused(false);
+            gameHud?.SetPaused(false);
+            return;
+        }
+
+        if (State != GameState.Aiming && State != GameState.Playing)
+            return;
+
+        stateBeforePause = State;
+        State = GameState.Pause;
+        timeController.SetPaused(true);
+        gameHud?.SetPaused(true);
+    }
+
+    private void PrepareStartScreen()
+    {
+        gameOver = false;
+        State = GameState.Start;
+        stateBeforePause = GameState.Aiming;
+        timeController.BeginRound();
+        feverController.BeginRound();
+        ballManager.PrepareForRound();
+        gameHud?.Refresh(Round, ballManager.PermanentBallCount);
+        gameHud?.ShowStartScreen();
     }
 
     private void ResolveSceneReferences()
@@ -76,110 +252,13 @@ public class GameManager : MonoBehaviour
         if (brickTemplate == null)
             brickTemplate = FindFirstObjectByType<BrickBlock>();
 
-        scoreText = scoreText != null ? scoreText : FindText("ScoreText");
-
         if (gameOverPanel == null)
             gameOverPanel = GameObject.Find("GameOverPanel");
 
         if (restartButton == null && gameOverPanel != null)
             restartButton = gameOverPanel.GetComponentInChildren<Button>(true);
-    }
 
-    private static TMP_Text FindText(string objectName)
-    {
-        GameObject target = GameObject.Find(objectName);
-        return target != null ? target.GetComponent<TMP_Text>() : null;
-    }
-
-    private void BuildBoard()
-    {
-        if (brickTemplate == null)
-            return;
-
-        brickTemplate.gameObject.SetActive(false);
-        activeBricks.Clear();
-
-        for (int row = 0; row < rows; row++)
-        {
-            for (int column = 0; column < columns; column++)
-            {
-                BrickBlock block = Instantiate(brickTemplate, transform);
-                block.gameObject.name = $"Brick_{row + 1}_{column + 1}";
-                block.transform.position = new Vector3(
-                    boardOrigin.x + column * horizontalSpacing,
-                    boardOrigin.y - row * verticalSpacing,
-                    0f);
-                block.gameObject.SetActive(true);
-
-                int hitPoints = 1 + ((row + stage - 1) % 4);
-                block.Configure(hitPoints, this);
-                activeBricks.Add(block);
-            }
-        }
-    }
-
-    public void NotifyBallLost(BallScript lostBall)
-    {
-        if (gameOver || lostBall == null || !lostBall.IsLaunched)
-            return;
-
-        lives--;
-
-        if (lives <= 0)
-        {
-            gameOver = true;
-            lostBall.PrepareForLaunch();
-            lostBall.gameObject.SetActive(false);
-
-            if (gameOverPanel != null)
-                gameOverPanel.SetActive(true);
-
-            UpdateHud();
-            return;
-        }
-
-        turn++;
-        lostBall.PrepareForLaunch();
-
-        UpdateHud();
-    }
-
-    public void NotifyBlockDamaged()
-    {
-        score += 5;
-        UpdateHud();
-    }
-
-    public void NotifyBlockDestroyed(BrickBlock block)
-    {
-        score += 25;
-        activeBricks.Remove(block);
-        UpdateHud();
-
-        if (activeBricks.Count == 0)
-            AdvanceStage();
-    }
-
-    private void AdvanceStage()
-    {
-        stage++;
-        turn++;
-        BuildBoard();
-
-        if (ball != null)
-            ball.PrepareForLaunch();
-
-        UpdateHud();
-    }
-
-    private void UpdateHud()
-    {
-        if (scoreText != null)
-            scoreText.text = score.ToString();
-    }
-
-    public void RestartGame()
-    {
-        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+        if (gameOverRoundText == null && gameOverPanel != null)
+            gameOverRoundText = gameOverPanel.transform.Find("GameOverCard/GameOverHint")?.GetComponent<TMP_Text>();
     }
 }

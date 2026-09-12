@@ -5,6 +5,7 @@ public class WallLayoutController : MonoBehaviour
 {
     [Header("References")]
     [SerializeField] private Camera targetCamera;
+    [SerializeField] private BlockGridManager blockGridManager;
     [SerializeField] private Transform leftWall;
     [SerializeField] private Transform rightWall;
     [SerializeField] private Transform topWall;
@@ -13,6 +14,9 @@ public class WallLayoutController : MonoBehaviour
 
     [Header("Wall Settings")]
     [SerializeField] private float wallThickness = 0.3f;
+
+    [Tooltip("Distance from the outermost brick edge to the wall's inner face.")]
+    [SerializeField, Min(0f)] private float sideBoundaryPadding = 0.08f;
 
     [SerializeField, Min(0.1f)] private float deathZoneHeight = 1.2f;
 
@@ -24,6 +28,9 @@ public class WallLayoutController : MonoBehaviour
     {
         if (targetCamera == null)
             targetCamera = Camera.main;
+
+        if (blockGridManager == null)
+            blockGridManager = FindFirstObjectByType<BlockGridManager>();
 
         if (deathZone == null)
         {
@@ -59,29 +66,24 @@ public class WallLayoutController : MonoBehaviour
 
         Vector3 camPos = targetCamera.transform.position;
 
-        float left = camPos.x - halfWidth;
-        float right = camPos.x + halfWidth;
+        float left = blockGridManager != null
+            ? blockGridManager.GetLeftGameplayBoundary(sideBoundaryPadding)
+            : camPos.x - halfWidth;
+        float right = blockGridManager != null
+            ? blockGridManager.GetRightGameplayBoundary(sideBoundaryPadding)
+            : camPos.x + halfWidth;
         float top = camPos.y + halfHeight;
         float bottom = camPos.y - halfHeight;
 
         // 벽의 절반 정도를 화면 밖으로 내보냄
-        leftWall.position = new Vector3(
-            left - wallThickness / 2f,
-            camPos.y,
-            0f
-        );
+        if (leftWall != null)
+            leftWall.position = new Vector3(left - wallThickness / 2f, camPos.y, 0f);
 
-        rightWall.position = new Vector3(
-            right + wallThickness / 2f,
-            camPos.y,
-            0f
-        );
+        if (rightWall != null)
+            rightWall.position = new Vector3(right + wallThickness / 2f, camPos.y, 0f);
 
-        topWall.position = new Vector3(
-            camPos.x,
-            top + wallThickness / 2f,
-            0f
-        );
+        if (topWall != null)
+            topWall.position = new Vector3(camPos.x, top + wallThickness / 2f, 0f);
 
         if (deathZone == null)
             return;
@@ -95,17 +97,16 @@ public class WallLayoutController : MonoBehaviour
         float width = halfWidth * 2f;
         float height = halfHeight * 2f;
 
-        leftWall.localScale =
-            new Vector3(wallThickness, height, 1f);
+        if (leftWall != null)
+            leftWall.localScale = new Vector3(wallThickness, height, 1f);
 
-        rightWall.localScale =
-            new Vector3(wallThickness, height, 1f);
+        if (rightWall != null)
+            rightWall.localScale = new Vector3(wallThickness, height, 1f);
 
-        topWall.localScale =
-            new Vector3(width, wallThickness, 1f);
+        if (topWall != null)
+            topWall.localScale = new Vector3(width, wallThickness, 1f);
 
-        deathZone.localScale =
-            new Vector3(width + wallThickness * 2f, deathZoneHeight, 1f);
+        deathZone.localScale = new Vector3(width + wallThickness * 2f, deathZoneHeight, 1f);
 
         lastCameraSize = targetCamera.orthographicSize;
         lastAspect = targetCamera.aspect;

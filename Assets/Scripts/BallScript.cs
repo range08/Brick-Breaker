@@ -1,157 +1,182 @@
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 /// <summary>
-/// Controls the single playable ball, including the ready/launch state and
-/// mouse or touch drag input used to aim it.
+/// A single physics ball. Volley input and lifecycle ownership live in BallManager.
 /// </summary>
 [RequireComponent(typeof(Rigidbody2D))]
 public class BallScript : MonoBehaviour
 {
     [Header("Launch")]
-    [SerializeField, Min(0.1f)]
-    private float speed = 15f;
+    [SerializeField, Min(0.1f)] private float speed = 15f;
 
-    [SerializeField, Min(0.01f)]
-    private float minimumDragPixels = 35f;
-
-    [SerializeField, Range(0f, 0.8f)]
-    private float minimumUpwardComponent = 0.2f;
+    [SerializeField, Range(0.01f, 0.2f)] private float minimumVerticalComponent = 0.1f;
 
     private Rigidbody2D ballRigidbody;
-    private Camera worldCamera;
+    private CircleCollider2D ballCollider;
+    private BallManager ballManager;
     private Vector3 launchPosition;
-    private Vector2 dragStartScreenPosition;
-    private bool isDragging;
     private bool isLaunched;
-
-    public bool IsLaunched => isLaunched;
-    public float Speed => speed;
+    private bool isReturning;
 
     private void Awake()
     {
-        ballRigidbody = GetComponent<Rigidbody2D>();
-        ballRigidbody.gravityScale = 0f;
-        ballRigidbody.interpolation = RigidbodyInterpolation2D.Interpolate;
-        ballRigidbody.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
+        CachePhysicsComponents();
+        SetPhysicsEnabled(false);
         launchPosition = transform.position;
-    }
-
-    private void Start()
-    {
-        worldCamera = Camera.main;
-        PrepareForLaunch();
-    }
-
-    private void Update()
-    {
-        if (isLaunched)
-            return;
-
-        if (TryGetPointerDown(out Vector2 pointerPosition))
-        {
-            dragStartScreenPosition = pointerPosition;
-            isDragging = true;
-        }
-
-        if (!isDragging)
-            return;
-
-        if (TryGetPointerUp(out pointerPosition))
-        {
-            isDragging = false;
-            TryLaunch(pointerPosition);
-        }
     }
 
     private void FixedUpdate()
     {
-        if (!isLaunched)
+        if (!isLaunched || ballRigidbody == null || ballRigidbody.linearVelocity.sqrMagnitude <= 0.01f)
             return;
 
-        // Keep the speed stable after repeated Rigidbody2D collisions.
-        if (ballRigidbody.linearVelocity.sqrMagnitude > 0.01f)
-            ballRigidbody.linearVelocity = ballRigidbody.linearVelocity.normalized * speed;
-    }
+        Vector2 direction = ballRigidbody.linearVelocity.normalized;
 
-    public void PrepareForLaunch()
-    {
-        isLaunched = false;
-        isDragging = false;
-        ballRigidbody.linearVelocity = Vector2.zero;
-        ballRigidbody.angularVelocity = 0f;
-        transform.position = launchPosition;
-    }
-
-    public void SetLaunchPosition(Vector3 position)
-    {
-        launchPosition = position;
-        PrepareForLaunch();
-    }
-
-    private void TryLaunch(Vector2 releaseScreenPosition)
-    {
-        if (worldCamera == null)
-            worldCamera = Camera.main;
-
-        if (worldCamera == null)
-            return;
-
-        if ((releaseScreenPosition - dragStartScreenPosition).sqrMagnitude < minimumDragPixels * minimumDragPixels)
-            return;
-
-        Vector2 targetWorldPosition = worldCamera.ScreenToWorldPoint(releaseScreenPosition);
-        Vector2 direction = targetWorldPosition - (Vector2)transform.position;
-
-        if (direction.sqrMagnitude < 0.01f)
-            return;
-
-        direction.Normalize();
-
-        // Prevent a nearly horizontal shot from getting trapped along the bottom edge.
-        if (direction.y < minimumUpwardComponent)
+        if (Mathf.Abs(direction.y) < minimumVerticalComponent)
         {
-            direction.y = minimumUpwardComponent;
+            float verticalSign = direction.y == 0f ? 1f : Mathf.Sign(direction.y);
+            direction.y = verticalSign * minimumVerticalComponent;
             direction.Normalize();
         }
 
-        isLaunched = true;
         ballRigidbody.linearVelocity = direction * speed;
     }
 
-    private static bool TryGetPointerDown(out Vector2 screenPosition)
+    public void Initialize(BallManager owner)
     {
-        if (Touchscreen.current != null && Touchscreen.current.primaryTouch.press.wasPressedThisFrame)
-        {
-            screenPosition = Touchscreen.current.primaryTouch.position.ReadValue();
-            return true;
-        }
-
-        if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
-        {
-            screenPosition = Mouse.current.position.ReadValue();
-            return true;
-        }
-
-        screenPosition = default;
-        return false;
+        ballManager = owner;
+        CachePhysicsComponents();
+        SetPhysicsEnabled(false);
     }
 
-    private static bool TryGetPointerUp(out Vector2 screenPosition)
+    public void PrepareForLaunch(Vector3 position)
     {
-        if (Touchscreen.current != null && Touchscreen.current.primaryTouch.press.wasReleasedThisFrame)
-        {
-            screenPosition = Touchscreen.current.primaryTouch.position.ReadValue();
-            return true;
-        }
+        launchPosition = position;
+        isLaunched = false;
+        isReturning = false;
 
-        if (Mouse.current != null && Mouse.current.leftButton.wasReleasedThisFrame)
-        {
-            screenPosition = Mouse.current.position.ReadValue();
-            return true;
-        }
+        SetPhysicsEnabled(false);
+        ballRigidbody.linearVelocity = Vector2.zero;
+        ballRigidbody.angularVelocity = 0f;
+        transform.position = launchPosition;
+        gameObject.SetActive(false);
+    }
 
-        screenPosition = default;
-        return false;
+    public void ShowReadyForAim(Vector3 position)
+    {
+        PrepareForLaunch(position);
+        gameObject.SetActive(true);
+    }
+
+    public void Launch(Vector2 direction)
+    {
+        if (ballRigidbody == null)
+            return;
+
+        gameObject.SetActive(true);
+        SetPhysicsEnabled(true);
+        isReturning = false;
+        isLaunched = true;
+        ballRigidbody.linearVelocity = direction.normalized * speed;
+    }
+
+    public void StopAndReturn(Vector3 position)
+    {
+        isLaunched = false;
+        isReturning = true;
+        ballRigidbody.linearVelocity = Vector2.zero;
+        ballRigidbody.angularVelocity = 0f;
+        SetPhysicsEnabled(false);
+        launchPosition = position;
+        transform.position = position;
+        gameObject.SetActive(false);
+    }
+
+    public void HoldAtLaunchPosition(Vector3 position)
+    {
+        launchPosition = position;
+        transform.position = position;
+        gameObject.SetActive(true);
+    }
+
+    public void SetReturnPosition(Vector3 position)
+    {
+        transform.position = position;
+    }
+
+    public void NotifyDeathZone()
+    {
+        if (!isLaunched || isReturning)
+            return;
+
+        isLaunched = false;
+        isReturning = true;
+        ballRigidbody.linearVelocity = Vector2.zero;
+        ballRigidbody.angularVelocity = 0f;
+        SetPhysicsEnabled(false);
+
+        if (ballManager == null)
+            ballManager = FindFirstObjectByType<BallManager>();
+
+        if (ballManager != null)
+            ballManager.NotifyBallReturned(this);
+    }
+
+    private void OnCollisionEnter2D(Collision2D collision)
+    {
+        if (!isLaunched || isReturning || GameManager.Instance == null)
+            return;
+
+        if (collision.collider.TryGetComponent<BallScript>(out _))
+            return;
+
+        if (collision.collider.TryGetComponent<BrickBlock>(out _))
+            GameManager.Instance.AudioManager?.PlayBallBlock();
+        else
+            GameManager.Instance.AudioManager?.PlayBallWall();
+    }
+
+    public float GetWorldRadius()
+    {
+        if (ballCollider == null)
+            return 0.25f;
+
+        Vector3 scale = transform.lossyScale;
+        float scaleFactor = Mathf.Max(Mathf.Abs(scale.x), Mathf.Abs(scale.y));
+        return ballCollider.radius * scaleFactor;
+    }
+
+    private void OnDisable()
+    {
+        if (ballRigidbody == null)
+            return;
+
+        ballRigidbody.linearVelocity = Vector2.zero;
+        ballRigidbody.angularVelocity = 0f;
+    }
+
+    private void SetPhysicsEnabled(bool enabled)
+    {
+        if (ballRigidbody != null)
+            ballRigidbody.simulated = enabled;
+
+        if (ballCollider != null)
+            ballCollider.enabled = enabled;
+    }
+
+    private void CachePhysicsComponents()
+    {
+        if (ballRigidbody == null)
+            ballRigidbody = GetComponent<Rigidbody2D>();
+
+        if (ballCollider == null)
+            ballCollider = GetComponent<CircleCollider2D>();
+
+        if (ballRigidbody == null)
+            return;
+
+        ballRigidbody.gravityScale = 0f;
+        ballRigidbody.interpolation = RigidbodyInterpolation2D.Interpolate;
+        ballRigidbody.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
     }
 }
